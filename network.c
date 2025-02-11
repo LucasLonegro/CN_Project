@@ -82,7 +82,7 @@ typedef __ssize_t read_link_weight(const network_t *, uint64_t, uint64_t);
 __ssize_t minDistance(path_t **distances, char *visited, uint64_t node_count)
 {
     // Initialize min value
-    int min = -1, min_index;
+    __ssize_t min = -1, min_index = -1;
 
     for (int v = 0; v < node_count; v++)
     {
@@ -124,6 +124,8 @@ path_t **dijkstra(const network_t *network, uint64_t from, read_link_weight read
     for (int count = 0; count < network->node_count - 1; count++)
     {
         int u = minDistance(distances, visited, network->node_count);
+        if (u == -1)
+            continue;
         SET_BIT(visited, u);
         for (int v = 0; v < network->node_count; v++)
         {
