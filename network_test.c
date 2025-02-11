@@ -25,7 +25,17 @@ int main(void)
             }
         }
     }
-    path_t *const *distances = weighted_distance(network, 0, 0);
+    path_t *const *distances = weighted_distances(network, 0);
+    for (int i = 0; i < V; i++)
+    {
+        printf("%ld:%ld\t", distances[i]->distance, distances[i]->length);
+        for(int j = 0; j < distances[i]->length; j++)
+            printf("%ld;", distances[i]->nodes[j]);
+        printf("\n");
+    }
+    printf("\n");
+
+    distances = unweighted_distances(network, 0);
     for (int i = 0; i < V; i++)
     {
         printf("%ld:%ld\t", distances[i]->distance, distances[i]->length);

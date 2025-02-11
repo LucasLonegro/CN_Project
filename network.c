@@ -15,18 +15,8 @@ network_t *new_network(uint64_t node_count)
         return NULL;
     network->node_count = node_count;
     network->adjacency_matrix = malloc(sizeof(__ssize_t) * node_count * node_count);
-    if (network->adjacency_matrix == NULL)
-    {
-        free(network);
-        return NULL;
-    }
     network->shortest_paths = calloc(node_count, sizeof(path_t *));
-    if (network->shortest_paths == NULL)
-    {
-        free(network->adjacency_matrix);
-        free(network);
-        return NULL;
-    }
+    network->shortest_unweighted_paths = calloc(node_count, sizeof(path_t *));
     for (int i = 0; i < node_count * node_count; i++)
         network->adjacency_matrix[i] = -1;
     return network;
@@ -45,8 +35,18 @@ void free_network(network_t *network)
             }
             free(network->shortest_paths[i]);
         }
+        if (network->shortest_unweighted_paths[i] != NULL)
+        {
+            for (int j = 0; j < network->node_count; j++)
+            {
+                free(network->shortest_unweighted_paths[i][j]->nodes);
+                free(network->shortest_unweighted_paths[i][j]);
+            }
+            free(network->shortest_unweighted_paths[i]);
+        }
     }
     free(network->shortest_paths);
+    free(network->shortest_unweighted_paths);
     free(network->adjacency_matrix);
     free(network);
 }
@@ -104,9 +104,9 @@ void copy_array(uint64_t *target, const uint64_t *source, uint64_t length)
     }
 }
 
-path_t *const *dijkstra(const network_t *network, uint64_t from, uint64_t to, read_link_weight read_function)
+path_t **dijkstra(const network_t *network, uint64_t from, read_link_weight read_function)
 {
-    if (from > network->node_count || to > network->node_count)
+    if (from > network->node_count)
         return NULL;
     char *visited = calloc(network->node_count, (sizeof(char) >> 3) + 1);
 
@@ -134,22 +134,29 @@ path_t *const *dijkstra(const network_t *network, uint64_t from, uint64_t to, re
                 distances[v]->distance = distances[u]->distance + link_distance;
                 copy_array(distances[v]->nodes, distances[u]->nodes, distances[u]->length);
                 distances[v]->length = distances[u]->length + 1;
-                distances[v]->nodes[distances[v]->length-1] = v;
+                distances[v]->nodes[distances[v]->length - 1] = v;
             }
         }
     }
 
-    network->shortest_paths[from] = distances;
     free(visited);
     return distances;
 }
 
-path_t *const *weighted_distance(const network_t *network, uint64_t from, uint64_t to)
+path_t *const *weighted_distances(const network_t *network, uint64_t from)
 {
-    return dijkstra(network, from, to, get_link_weight);
+    if (network->shortest_paths[from] != NULL)
+        return network->shortest_paths[from];
+    path_t **distances = dijkstra(network, from, get_link_weight);
+    network->shortest_paths[from] = distances;
+    return distances;
 }
 
-path_t *const *unweighted_distance(const network_t *network, uint64_t from, uint64_t to)
+path_t *const *unweighted_distances(const network_t *network, uint64_t from)
 {
-    return dijkstra(network, from, to, get_link_distance);
+    if (network->shortest_unweighted_paths[from] != NULL)
+        return network->shortest_unweighted_paths[from];
+    path_t **distances = dijkstra(network, from, get_link_distance);
+    network->shortest_unweighted_paths[from] = distances;
+    return distances;
 }

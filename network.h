@@ -14,6 +14,7 @@ typedef struct network_t
     uint64_t node_count;
     __ssize_t *adjacency_matrix;
     path_t ***shortest_paths;
+    path_t ***shortest_unweighted_paths;
 } network_t;
 
 
@@ -24,7 +25,7 @@ int set_link_weight(network_t *network, uint64_t nodeid1, uint64_t nodeid2, __ss
 
 __ssize_t get_link_weight(const network_t *network, uint64_t nodeid1, uint64_t nodeid2);
 
-path_t *const*weighted_distance(const network_t *network, uint64_t nodeid1, uint64_t nodeid2);
-path_t *const*unweighted_distance(const network_t *network, uint64_t nodeid1, uint64_t nodeid2);
+path_t *const*weighted_distances(const network_t *network, uint64_t nodeid);
+path_t *const*unweighted_distances(const network_t *network, uint64_t nodeid);
 
 #endif
