@@ -29,7 +29,7 @@ int main(void)
     for (int i = 0; i < V; i++)
     {
         printf("%ld:%ld\t", distances[i]->distance, distances[i]->length);
-        for(int j = 0; j < distances[i]->length; j++)
+        for(int j = 0; j < distances[i]->length + 1; j++)
             printf("%ld;", distances[i]->nodes[j]);
         printf("\n");
     }
@@ -39,7 +39,7 @@ int main(void)
     for (int i = 0; i < V; i++)
     {
         printf("%ld:%ld\t", distances[i]->distance, distances[i]->length);
-        for(int j = 0; j < distances[i]->length; j++)
+        for(int j = 0; j < distances[i]->length + 1; j++)
             printf("%ld;", distances[i]->nodes[j]);
         printf("\n");
     }

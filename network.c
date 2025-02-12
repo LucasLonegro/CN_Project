@@ -115,6 +115,7 @@ path_t **dijkstra(const network_t *network, uint64_t from, read_link_weight read
     {
         distances[i] = malloc(sizeof(path_t));
         distances[i]->nodes = malloc(sizeof(uint64_t) * network->node_count);
+        distances[i]->nodes[0] = from;
         distances[i]->distance = -1;
         distances[i]->length = -1;
     }
@@ -134,9 +135,9 @@ path_t **dijkstra(const network_t *network, uint64_t from, read_link_weight read
             if (!IS_BIT_SET(visited, v) && link_distance != -1 && current_distance != -1 && (current_distance + link_distance < distances[v]->distance || distances[v]->distance == -1))
             {
                 distances[v]->distance = distances[u]->distance + link_distance;
-                copy_array(distances[v]->nodes, distances[u]->nodes, distances[u]->length);
+                copy_array(distances[v]->nodes, distances[u]->nodes, distances[u]->length + 1);
                 distances[v]->length = distances[u]->length + 1;
-                distances[v]->nodes[distances[v]->length - 1] = v;
+                distances[v]->nodes[distances[v]->length] = v;
             }
         }
     }
