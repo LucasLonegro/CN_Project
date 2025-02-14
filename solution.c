@@ -3,6 +3,7 @@
 #include "network.h"
 #include "problem.h"
 #include "routing_solution.h"
+#include "modulation_assignment.h"
 
 int main(void)
 {
@@ -63,11 +64,44 @@ int main(void)
     for (uint64_t i = 0; i < requests; i++)
     {
         routing_assignment assignment = a[i];
-        printf("Load: %ld\t", assignment.load);
-        printf("Distance: %ld\t", assignment.path->distance);
         for (uint64_t j = 0; j <= assignment.path->length; j++)
         {
-            printf("%ld->", assignment.path->nodes[j] + 1);
+            printf("%ld", assignment.path->nodes[j] + 1);
+            if (j != assignment.path->length)
+                printf("->");
+        }
+        printf("\n");
+        printf("Load: %ld\t", assignment.load);
+        printf("Distance: %ld\t", assignment.path->distance);
+    }
+
+    uint64_t total_link_loads[ITALIAN_TOPOLOGY_SIZE * ITALIAN_TOPOLOGY_SIZE];
+    for (uint64_t i = 0; i < requests; i++)
+    {
+        routing_assignment assignment = a[i];
+        for (uint64_t node = 0; node < assignment.path->length; node++)
+        {
+            total_link_loads[assignment.path->nodes[node] * ITALIAN_TOPOLOGY_SIZE + assignment.path->nodes[node + 1]] += assignment.load;
+        }
+    }
+
+    printf("TOTAL LINK LOADS\n");
+    for (uint64_t i = 0; i < ITALIAN_TOPOLOGY_SIZE; i++)
+    {
+        for (uint64_t j = 0; j < ITALIAN_TOPOLOGY_SIZE; j++)
+        {
+            printf("%ld\t", total_link_loads[i * ITALIAN_TOPOLOGY_SIZE + j]);
+        }
+        printf("\n");
+    }
+
+    uint64_t assigned_formats[ITALIAN_TOPOLOGY_SIZE * ITALIAN_TOPOLOGY_SIZE * MODULATION_FORMATS_DIM] = {0};
+    assign_modulation_formats(italian_network, formats, MODULATION_FORMATS_DIM, a, requests, assigned_formats);
+    for (uint64_t i = 0; i < ITALIAN_TOPOLOGY_SIZE; i++)
+    {
+        for (uint64_t j = 0; j < ITALIAN_TOPOLOGY_SIZE; j++)
+        {
+            printf("{%ld, %ld, %ld}\t", assigned_formats[(i * ITALIAN_TOPOLOGY_SIZE + j) * MODULATION_FORMATS_DIM], assigned_formats[(i * ITALIAN_TOPOLOGY_SIZE + j) * MODULATION_FORMATS_DIM + 1], assigned_formats[(i * ITALIAN_TOPOLOGY_SIZE + j) * MODULATION_FORMATS_DIM + 2]);
         }
         printf("\n");
     }
