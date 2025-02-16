@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include "network.h"
 #include "problem.h"
 #include "routing_solution.h"
@@ -75,7 +76,7 @@ int main(void)
         printf("Distance: %ld\t", assignment.path->distance);
     }
 
-    uint64_t total_link_loads[ITALIAN_TOPOLOGY_SIZE * ITALIAN_TOPOLOGY_SIZE];
+    uint64_t total_link_loads[ITALIAN_TOPOLOGY_SIZE * ITALIAN_TOPOLOGY_SIZE] = {0};
     for (uint64_t i = 0; i < requests; i++)
     {
         routing_assignment assignment = a[i];
@@ -85,7 +86,7 @@ int main(void)
         }
     }
 
-    printf("TOTAL LINK LOADS\n");
+    printf("\nTOTAL LINK LOADS\n");
     for (uint64_t i = 0; i < ITALIAN_TOPOLOGY_SIZE; i++)
     {
         for (uint64_t j = 0; j < ITALIAN_TOPOLOGY_SIZE; j++)
@@ -96,7 +97,8 @@ int main(void)
     }
 
     uint64_t assigned_formats[ITALIAN_TOPOLOGY_SIZE * ITALIAN_TOPOLOGY_SIZE * MODULATION_FORMATS_DIM] = {0};
-    assign_modulation_formats(italian_network, formats, MODULATION_FORMATS_DIM, a, requests, assigned_formats);
+    uint64_t *assigned_spectra = calloc(requests, sizeof(uint64_t));
+    assign_modulation_formats_and_spectra(italian_network, formats, MODULATION_FORMATS_DIM, a, requests, assigned_formats, assigned_spectra);
     for (uint64_t i = 0; i < ITALIAN_TOPOLOGY_SIZE; i++)
     {
         for (uint64_t j = 0; j < ITALIAN_TOPOLOGY_SIZE; j++)
@@ -105,6 +107,13 @@ int main(void)
         }
         printf("\n");
     }
+
+    for (uint64_t i = 0; i < requests; i++)
+    {
+        printf("%ld->%ld, λ_%ld\n", a[i].path->nodes[0], a[i].path->nodes[a[i].path->length], assigned_spectra[i]);
+    }
+
+    free(assigned_spectra);
 
     free_network(german_network);
     free_network(italian_network);

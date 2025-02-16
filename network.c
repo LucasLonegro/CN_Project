@@ -108,7 +108,7 @@ path_t **dijkstra(const network_t *network, uint64_t from, read_link_weight read
 {
     if (from > network->node_count)
         return NULL;
-    char *visited = calloc(network->node_count, (sizeof(char) >> 3) + 1);
+    char *visited = calloc((network->node_count >> 3) + 1, sizeof(char));
 
     path_t **distances = calloc(network->node_count, sizeof(__ssize_t));
     for (__ssize_t i = 0; i < network->node_count; i++)
