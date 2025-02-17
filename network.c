@@ -17,18 +17,18 @@ network_t *new_network(uint64_t node_count)
     network->adjacency_matrix = malloc(sizeof(__ssize_t) * node_count * node_count);
     network->shortest_paths = calloc(node_count, sizeof(path_t *));
     network->shortest_unweighted_paths = calloc(node_count, sizeof(path_t *));
-    for (int i = 0; i < node_count * node_count; i++)
+    for (uint64_t i = 0; i < node_count * node_count; i++)
         network->adjacency_matrix[i] = -1;
     return network;
 }
 
 void free_network(network_t *network)
 {
-    for (int i = 0; i < network->node_count; i++)
+    for (uint64_t i = 0; i < network->node_count; i++)
     {
         if (network->shortest_paths[i] != NULL)
         {
-            for (int j = 0; j < network->node_count; j++)
+            for (uint64_t j = 0; j < network->node_count; j++)
             {
                 free(network->shortest_paths[i][j]->nodes);
                 free(network->shortest_paths[i][j]);
@@ -37,7 +37,7 @@ void free_network(network_t *network)
         }
         if (network->shortest_unweighted_paths[i] != NULL)
         {
-            for (int j = 0; j < network->node_count; j++)
+            for (uint64_t j = 0; j < network->node_count; j++)
             {
                 free(network->shortest_unweighted_paths[i][j]->nodes);
                 free(network->shortest_unweighted_paths[i][j]);
@@ -84,7 +84,7 @@ __ssize_t minDistance(path_t **distances, char *visited, uint64_t node_count)
     // Initialize min value
     __ssize_t min = -1, min_index = -1;
 
-    for (int v = 0; v < node_count; v++)
+    for (uint64_t v = 0; v < node_count; v++)
     {
         if (!IS_BIT_SET(visited, v) && (distances[v]->distance != -1 && (distances[v]->distance <= min || min == -1)))
         {
@@ -98,52 +98,21 @@ __ssize_t minDistance(path_t **distances, char *visited, uint64_t node_count)
 
 void copy_array(uint64_t *target, const uint64_t *source, uint64_t length)
 {
-    for (int i = 0; i < length; i++)
+    for (uint64_t i = 0; i < length; i++)
     {
         target[i] = source[i];
     }
 }
 
+int noop_validator(const network_t *network, uint64_t from, uint64_t to, const void *data)
+{
+    return 1;
+}
+
+path_t **modified_dijkstra(const network_t *network, uint64_t from, read_link_weight read_function, link_validator validator, void *data);
 path_t **dijkstra(const network_t *network, uint64_t from, read_link_weight read_function)
 {
-    if (from > network->node_count)
-        return NULL;
-    char *visited = calloc((network->node_count >> 3) + 1, sizeof(char));
-
-    path_t **distances = calloc(network->node_count, sizeof(__ssize_t));
-    for (__ssize_t i = 0; i < network->node_count; i++)
-    {
-        distances[i] = malloc(sizeof(path_t));
-        distances[i]->nodes = malloc(sizeof(uint64_t) * network->node_count);
-        distances[i]->nodes[0] = from;
-        distances[i]->distance = -1;
-        distances[i]->length = -1;
-    }
-
-    distances[from]->distance = 0;
-    distances[from]->length = 0;
-    for (int count = 0; count < network->node_count - 1; count++)
-    {
-        int u = minDistance(distances, visited, network->node_count);
-        if (u == -1)
-            continue;
-        SET_BIT(visited, u);
-        for (int v = 0; v < network->node_count; v++)
-        {
-            __ssize_t link_distance = read_function(network, u, v);
-            __ssize_t current_distance = distances[u]->distance;
-            if (!IS_BIT_SET(visited, v) && link_distance != -1 && current_distance != -1 && (current_distance + link_distance < distances[v]->distance || distances[v]->distance == -1))
-            {
-                distances[v]->distance = distances[u]->distance + link_distance;
-                copy_array(distances[v]->nodes, distances[u]->nodes, distances[u]->length + 1);
-                distances[v]->length = distances[u]->length + 1;
-                distances[v]->nodes[distances[v]->length] = v;
-            }
-        }
-    }
-
-    free(visited);
-    return distances;
+    return modified_dijkstra(network, from, read_function, noop_validator, NULL);
 }
 
 path_t *const *weighted_distances(const network_t *network, uint64_t from)
@@ -161,5 +130,61 @@ path_t *const *unweighted_distances(const network_t *network, uint64_t from)
         return network->shortest_unweighted_paths[from];
     path_t **distances = dijkstra(network, from, get_link_distance);
     network->shortest_unweighted_paths[from] = distances;
+    return distances;
+}
+
+path_t **modified_weighted_distances(const network_t *network, uint64_t from, link_validator validator, void *data)
+{
+    return modified_dijkstra(network, from, get_link_weight, validator, data);
+}
+
+void free_distances(const network_t *network, path_t **distances)
+{
+    for (uint64_t i = 0; i < network->node_count; i++)
+    {
+        free(distances[i]->nodes);
+    }
+    free(distances);
+}
+
+path_t **modified_dijkstra(const network_t *network, uint64_t from, read_link_weight read_function, link_validator validator, void *data)
+{
+    if (from > network->node_count)
+        return NULL;
+    char *visited = calloc((network->node_count >> 3) + 1, sizeof(char));
+
+    path_t **distances = calloc(network->node_count, sizeof(path_t *));
+    for (__ssize_t i = 0; i < network->node_count; i++)
+    {
+        distances[i] = malloc(sizeof(path_t));
+        distances[i]->nodes = malloc(sizeof(uint64_t) * network->node_count);
+        distances[i]->nodes[0] = from;
+        distances[i]->distance = -1;
+        distances[i]->length = -1;
+    }
+
+    distances[from]->distance = 0;
+    distances[from]->length = 0;
+    for (uint64_t count = 0; count < network->node_count - 1; count++)
+    {
+        int u = minDistance(distances, visited, network->node_count);
+        if (u == -1)
+            continue;
+        SET_BIT(visited, u);
+        for (uint64_t v = 0; v < network->node_count; v++)
+        {
+            __ssize_t link_distance = read_function(network, u, v);
+            __ssize_t current_distance = distances[u]->distance;
+            if (!IS_BIT_SET(visited, v) && link_distance != -1 && current_distance != -1 && (current_distance + link_distance < distances[v]->distance || distances[v]->distance == -1) && validator(network, u, v, data))
+            {
+                distances[v]->distance = distances[u]->distance + link_distance;
+                copy_array(distances[v]->nodes, distances[u]->nodes, distances[u]->length + 1);
+                distances[v]->length = distances[u]->length + 1;
+                distances[v]->nodes[distances[v]->length] = v;
+            }
+        }
+    }
+
+    free(visited);
     return distances;
 }

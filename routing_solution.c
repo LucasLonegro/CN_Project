@@ -1,35 +1,156 @@
 
 #include "routing_solution.h"
 #include <stdlib.h>
+#include <stdio.h>
 
-/**
- * @brief A function that receives a network, a set of assigned pathing requests, a connection request, the index of that request, the total number of connection requests, and an abstract data structure it may modify
- * @return The index of the next connection request it wants to observe, -1 if done
- *
- */
-typedef __ssize_t (*assigner)(const network_t *network, routing_assignment *current_assignments, connection_request request, uint64_t request_index, uint64_t request_count, void *data);
+typedef __ssize_t (*new_assigner)(const network_t *network, assignment_t *current_assignments, connection_request request, uint64_t request_index, uint64_t request_count, const modulation_format *formats, uint64_t formats_dim, void **data, dynamic_char_array *link_slot_usages_ret);
 
-__ssize_t fixed_shortest_path(const network_t *network, routing_assignment *current_assignments, connection_request request, uint64_t request_index, uint64_t request_count, void *data)
+path_t *find_shortest_path(const network_t *network, uint64_t from_node_id, uint64_t to_node_id)
 {
-    if(request_index >= request_count)
+    path_t *const *distances = weighted_distances(network, from_node_id);
+    path_t *assigned_path = distances[to_node_id];
+    return assigned_path;
+}
+
+void accumulate_slots(const network_t *network, const path_t *path, dynamic_char_array *source_arrays, dynamic_char_array *array)
+{
+    // go through each link in the path assigned, set to 1 any slot that is occupied in any link along that path, as well as 1 FSU as guard band
+    for (uint64_t i = 0; i < path->length; i++)
+    {
+        for (uint64_t j = 0; j < source_arrays[path->nodes[i] * network->node_count + path->nodes[i + 1]].size; j++)
+        {
+            if (get_element(source_arrays + path->nodes[i] * network->node_count + path->nodes[i + 1], j))
+            {
+                set_element(array, j, 1);
+            }
+        }
+    }
+}
+
+void set_slots_on_path(const network_t *network, const path_t *path, dynamic_char_array *arrays, uint64_t start_slot, uint64_t end_slot)
+{
+    for (uint64_t i = 0; i < path->length; i++)
+    {
+        for (uint64_t j = start_slot; j <= end_slot; j++)
+        {
+            set_element(arrays + path->nodes[i] * network->node_count + path->nodes[i + 1], j, 1);
+        }
+    }
+}
+
+__ssize_t first_fit_slot_assignment(const network_t *network, const modulation_format *formats, assignment_t *assignment_ret, dynamic_char_array *link_slot_usages_ret)
+{
+    dynamic_char_array *available_slots = new_dynamic_char_array();
+    accumulate_slots(network, assignment_ret->path, link_slot_usages_ret, available_slots);
+
+    uint64_t slot_requirement = (uint64_t)(formats[assignment_ret->format].channel_bandwidth / FSU_BANDWIDTH + 0.5);
+    uint64_t consecutive_slots = 0;
+    for (uint64_t i = 0; i < MAX_SPECTRAL_SLOTS; i++)
+    {
+        if (!get_element(available_slots, i))
+        {
+            consecutive_slots++;
+            if (consecutive_slots >= slot_requirement)
+            {
+                assignment_ret->start_slot = i - slot_requirement + 1;
+                assignment_ret->end_slot = i + 1;
+                set_slots_on_path(network, assignment_ret->path, link_slot_usages_ret, assignment_ret->start_slot, assignment_ret->end_slot);
+                for (uint64_t j = assignment_ret->start_slot; j < assignment_ret->end_slot; j++)
+                {
+                    set_element(link_slot_usages_ret, j, 1);
+                }
+                free_dynamic_char_array(available_slots);
+                return i;
+            }
+        }
+        else
+        {
+            consecutive_slots = 0;
+        }
+    }
+    free_dynamic_char_array(available_slots);
+    return -1;
+}
+
+__ssize_t assign_modulation_format(const modulation_format *formats, uint64_t formats_dim, assignment_t *assignment_ret)
+{
+    __ssize_t format_index = -1;
+    for (uint64_t i = 0; i < formats_dim; i++)
+    {
+        if (formats[i].maximum_length >= assignment_ret->path->distance)
+        {
+            if (formats[i].line_rate > assignment_ret->load)
+            {
+                assignment_ret->format = i;
+                return 0;
+            }
+            format_index = i;
+        }
+    }
+    if (format_index == -1)
         return -1;
-    current_assignments[request_index].load = request.load;
-    current_assignments[request_index].path = weighted_distances(network, request.from_node_id)[request.to_node_id];
+    uint64_t load = assignment_ret->load;
+    assignment_ret->load = formats[format_index].line_rate;
+    return load - formats[format_index].line_rate;
+}
+
+__ssize_t fixed_shortest_path(const network_t *network, assignment_t *current_assignments, connection_request request, uint64_t request_index, uint64_t request_count, const modulation_format *formats, uint64_t formats_dim, void **data, dynamic_char_array *link_slot_usages_ret)
+{
+
+    if (request_index >= request_count)
+    {
+        return -1;
+    }
+
+    __ssize_t leftover_load = request.load;
+    assignment_t *assignment = current_assignments + request_index;
+    do
+    {
+        path_t *assigned_path = find_shortest_path(network, request.from_node_id, request.to_node_id);
+        assignment->load = leftover_load;
+        assignment->path = assigned_path;
+        assignment->is_split = 0;
+
+        if (assigned_path->length == -1)
+        {
+            printf("\n\nFAILED TO ASSIGN A PATH\n\n");
+        }
+
+        leftover_load = assign_modulation_format(formats, formats_dim, assignment);
+
+        if (leftover_load == -1)
+        {
+            printf("\n\nFAILED TO ASSIGN A PATH\n\n");
+        }
+
+        first_fit_slot_assignment(network, formats, assignment, link_slot_usages_ret);
+
+        if (leftover_load)
+        {
+            assignment_t *split_assignment = calloc(1, sizeof(assignment_t));
+            assignment->split = split_assignment;
+            assignment->is_split = 1;
+            split_assignment->is_split = 0;
+
+            assignment = split_assignment;
+        }
+    } while (leftover_load);
+
     return request_index + 1;
 }
 
-void run_routing_algorithm(const network_t *network, connection_request *requests, uint64_t requests_dim, void *data, assigner algorithm, routing_assignment *assignments_ret)
+void run_routing_algorithm(const network_t *network, connection_request *requests, uint64_t requests_dim, const modulation_format *formats, uint64_t formats_dim, new_assigner algorithm, assignment_t *assignments_ret, dynamic_char_array *link_slot_usages_ret)
 {
+    void *data = NULL;
     uint64_t index = 0;
     while (index != -1)
     {
-        index = algorithm(network, assignments_ret, requests[index], index, requests_dim, data);
+        index = algorithm(network, assignments_ret, requests[index], index, requests_dim, formats, formats_dim, &data, link_slot_usages_ret);
     }
     return;
 }
 
-void generate_routing(const network_t *network, connection_request *requests, uint64_t requests_dim, routing_assignment *assignments_ret)
+void generate_routing(const network_t *network, connection_request *requests, uint64_t requests_dim, const modulation_format *formats, uint64_t formats_dim, assignment_t *assignments_ret, dynamic_char_array *link_slot_usages_ret)
 {
-    run_routing_algorithm(network, requests, requests_dim, NULL, fixed_shortest_path, assignments_ret);
-    return;
+    run_routing_algorithm(network, requests, requests_dim, formats, formats_dim, fixed_shortest_path, assignments_ret, link_slot_usages_ret);
 }

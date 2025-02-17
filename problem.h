@@ -8,6 +8,7 @@
 #define GERMAN_LINKS_SIZE 22
 #define MODULATION_FORMATS_DIM 3
 #define MAX_SPECTRAL_SLOTS 320
+#define FSU_BANDWIDTH 12.5
 
 typedef struct modulation_format
 {
