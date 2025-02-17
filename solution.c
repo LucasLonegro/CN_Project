@@ -18,25 +18,25 @@ void free_assignment(assignment_t *assignment)
     free(assignment);
 }
 
-void print_assignment(const assignment_t assignment)
+void print_assignment(const assignment_t assignment, FILE *file)
 {
     for (uint64_t j = 0; j <= assignment.path->length; j++)
     {
         if (assignment.path->length == -1)
             break;
-        printf("%ld", assignment.path->nodes[j] + 1);
+        fprintf(file, "%ld", assignment.path->nodes[j] + 1);
         if (j != assignment.path->length)
-            printf("->");
+            fprintf(file, "->");
     }
-    printf("\t");
-    printf("Load: %ld\t", assignment.load);
-    printf("Distance: %ld\t", assignment.path->distance);
-    printf("Slots: %ld-%ld", assignment.start_slot, assignment.end_slot);
+    fprintf(file, "\t");
+    fprintf(file, "Load: %ld\t", assignment.load);
+    fprintf(file, "Distance: %ld\t", assignment.path->distance);
+    fprintf(file, "Slots: %ld-%ld", assignment.start_slot, assignment.end_slot);
     if (assignment.is_split)
     {
-        printf("\t[");
-        print_assignment(*(assignment.split));
-        printf("]\t");
+        fprintf(file, "\t[");
+        print_assignment(*(assignment.split), file);
+        fprintf(file, "]\t");
     }
 }
 
@@ -72,11 +72,11 @@ void run_solution(uint64_t topology_node_count, uint64_t links[][3], uint64_t li
     generate_routing(network, requests, requests_count, formats, MODULATION_FORMATS_DIM, assignments, used_frequency_slots);
     for (uint64_t i = 0; i < requests_count; i++)
     {
-        print_assignment(assignments[i]);
-        printf("\n");
+        print_assignment(assignments[i], file);
+        fprintf(file, "\n");
     }
 
-    printf("\nTOTAL LINK LOADS\n");
+    fprintf(file, "\nTOTAL LINK LOADS\n");
     uint64_t *total_link_loads = calloc(topology_node_count * topology_node_count, sizeof(uint64_t));
     for (uint64_t i = 0; i < requests_count; i++)
     {
@@ -93,11 +93,11 @@ void run_solution(uint64_t topology_node_count, uint64_t links[][3], uint64_t li
     {
         for (uint64_t j = 0; j < topology_node_count; j++)
         {
-            printf("%ld\t", total_link_loads[i * topology_node_count + j]);
+            fprintf(file, "%ld\t", total_link_loads[i * topology_node_count + j]);
         }
-        printf("\n");
+        fprintf(file, "\n");
     }
-    printf("\n");
+    fprintf(file, "\n");
 
     for (uint64_t i = 0; i < requests_count; i++)
     {
@@ -120,6 +120,12 @@ void run_solution(uint64_t topology_node_count, uint64_t links[][3], uint64_t li
 
 int main(void)
 {
+    run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_1, stdout);
+    run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_2, stdout);
+    run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_3, stdout);
+    run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_4, stdout);
+    run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_5, stdout);
+
     run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_1, stdout);
     run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_2, stdout);
     run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_3, stdout);
