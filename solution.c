@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <math.h>
 #include "network.h"
 #include "problem.h"
 #include "routing_solution.h"
@@ -40,6 +41,61 @@ void print_assignment(const assignment_t assignment, FILE *file)
     }
 }
 
+__ssize_t highest_fsu_in_assignent(assignment_t *assignment)
+{
+    if (assignment->is_split)
+    {
+        uint64_t split_slot = highest_fsu_in_assignent(assignment->split);
+        if (split_slot > assignment->end_slot)
+            return split_slot;
+    }
+    return assignment->end_slot;
+}
+
+double utilization_entropy(const dynamic_char_array *frequency_slots)
+{
+    if (frequency_slots->size <= 0)
+        return 0;
+    uint64_t status_changes = 0;
+    int status = get_element(frequency_slots, 0) == USED ? USED : UNUSED;
+    for (uint64_t i = 0; i < frequency_slots->size; i++)
+    {
+        int slot_status = get_element(frequency_slots, i) == USED ? USED : UNUSED;
+        if (slot_status != status)
+        {
+            status = slot_status;
+            status_changes++;
+        }
+    }
+    return (double)status_changes / (MAX_SPECTRAL_SLOTS - 1);
+}
+
+double shannon_entropy(const dynamic_char_array *frequency_slots)
+{
+    if (frequency_slots->size <= 0)
+        return 0;
+    double entropy = 0;
+    uint64_t status_changes = 0;
+    uint64_t block_size = 0;
+    int status = get_element(frequency_slots, 0) == USED ? USED : UNUSED;
+
+    for (uint64_t i = 0; i < frequency_slots->size; i++)
+    {
+        int slot_status = get_element(frequency_slots, i) == USED ? USED : UNUSED;
+        if (slot_status != status)
+        {
+            if (slot_status == UNUSED)
+                entropy += ((double)block_size / MAX_SPECTRAL_SLOTS) * log((double)block_size / MAX_SPECTRAL_SLOTS);
+            status = slot_status;
+            status_changes++;
+            block_size = 0;
+        }
+        block_size++;
+    }
+
+    return -entropy;
+}
+
 void run_solution(uint64_t topology_node_count, uint64_t links[][3], uint64_t links_count, const uint64_t *connection_requests, FILE *file)
 {
     network_t *network = new_network(topology_node_count);
@@ -55,7 +111,7 @@ void run_solution(uint64_t topology_node_count, uint64_t links[][3], uint64_t li
     {
         for (uint64_t j = 0; j < topology_node_count; j++)
         {
-            if (connection_requests[i] > 0)
+            if (connection_requests[i] > 0 && i != j)
             {
                 requests[requests_count].load = connection_requests[i * topology_node_count + j];
                 requests[requests_count].from_node_id = i;
@@ -70,13 +126,7 @@ void run_solution(uint64_t topology_node_count, uint64_t links[][3], uint64_t li
     dynamic_char_array *used_frequency_slots = calloc(topology_node_count * topology_node_count, sizeof(dynamic_char_array));
 
     generate_routing(network, requests, requests_count, formats, MODULATION_FORMATS_DIM, assignments, used_frequency_slots);
-    for (uint64_t i = 0; i < requests_count; i++)
-    {
-        print_assignment(assignments[i], file);
-        fprintf(file, "\n");
-    }
 
-    fprintf(file, "\nTOTAL LINK LOADS\n");
     uint64_t *total_link_loads = calloc(topology_node_count * topology_node_count, sizeof(uint64_t));
     for (uint64_t i = 0; i < requests_count; i++)
     {
@@ -89,15 +139,103 @@ void run_solution(uint64_t topology_node_count, uint64_t links[][3], uint64_t li
         }
     }
 
+    fprintf(file, "\nRMSAs\n");
+    for (uint64_t i = 0; i < requests_count; i++)
+    {
+        print_assignment(assignments[i], file);
+        fprintf(file, "\n");
+    }
+
+    fprintf(file, "\nPERFORMANCE PARAMENTERS\n");
+    __ssize_t highest_fsu = -1;
+    for (uint64_t i = 0; i < requests_count; i++)
+    {
+        __ssize_t slot = highest_fsu_in_assignent(assignments + i);
+        if (slot > highest_fsu)
+            highest_fsu = slot;
+    }
+    fprintf(file, "Highest used fsu: %ld\n", highest_fsu);
+
+    fprintf(file, "Link usage distribution:\n");
     for (uint64_t i = 0; i < topology_node_count; i++)
     {
         for (uint64_t j = 0; j < topology_node_count; j++)
         {
-            fprintf(file, "%ld\t", total_link_loads[i * topology_node_count + j]);
+            if (get_link_weight(network, i, j) > 0)
+                fprintf(file, "%ld\t", total_link_loads[i * topology_node_count + j]);
+            else
+                fprintf(file, "■\t");
         }
         fprintf(file, "\n");
     }
     fprintf(file, "\n");
+
+    fprintf(file, "Path length distribution:\n");
+    for (uint64_t i = 0, request_index = 0; i < topology_node_count; i++)
+    {
+        for (uint64_t j = 0; j < topology_node_count && request_index < requests_count; j++)
+        {
+            if (links[i * topology_node_count + j] > 0 && i != j)
+            {
+                fprintf(file, "%ld", assignments[request_index].path->distance);
+                if (assignments[request_index].is_split)
+                {
+                    fprintf(file, " [%ld]", assignments[request_index].path->distance);
+                }
+                else
+                {
+                    fprintf(file, "\t");
+                }
+                fprintf(file, "\t");
+                request_index++;
+            }
+            else
+            {
+                printf("\t\t");
+            }
+        }
+        fprintf(file, "\n");
+    }
+
+    fprintf(file, "Utilization entropies [thousandths]:\n");
+    for (uint64_t i = 0; i < topology_node_count; i++)
+    {
+        for (uint64_t j = 0; j < topology_node_count; j++)
+        {
+            if (get_link_weight(network, i, j) != -1)
+            {
+                fprintf(file, "%.2f\t", utilization_entropy(used_frequency_slots + i * topology_node_count + j) * 1000);
+            }
+            else
+            {
+                printf("\t");
+            }
+        }
+        fprintf(file, "\n");
+    }
+    fprintf(file, "\n");
+
+    fprintf(file, "Shannon entropies:\n");
+    for (uint64_t i = 0; i < topology_node_count; i++)
+    {
+        for (uint64_t j = 0; j < topology_node_count; j++)
+        {
+            if (get_link_weight(network, i, j) != -1)
+            {
+                fprintf(file, "%.2f\t", shannon_entropy(used_frequency_slots + i * topology_node_count + j));
+            }
+            else
+            {
+                printf("\t");
+            }
+        }
+        fprintf(file, "\n");
+    }
+    fprintf(file, "\n");
+
+    fprintf(file, "\n");
+
+    fprintf(file, "\nEND\n");
 
     for (uint64_t i = 0; i < requests_count; i++)
     {
@@ -120,16 +258,16 @@ void run_solution(uint64_t topology_node_count, uint64_t links[][3], uint64_t li
 
 int main(void)
 {
-    run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_1, stdout);
-    run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_2, stdout);
-    run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_3, stdout);
-    run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_4, stdout);
-    run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_5, stdout);
-
-    run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_1, stdout);
-    run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_2, stdout);
-    run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_3, stdout);
-    run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_4, stdout);
+    // run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_1, stdout);
+    // run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_2, stdout);
+    // run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_3, stdout);
+    // run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_4, stdout);
+    // run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_5, stdout);
+    //
+    // run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_1, stdout);
+    // run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_2, stdout);
+    // run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_3, stdout);
+    // run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_4, stdout);
     run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_5, stdout);
     return 0;
 }
