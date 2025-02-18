@@ -4,6 +4,13 @@
 #include "problem.h"
 #include "utils.h"
 
+typedef enum slot_status
+{
+    UNUSED = 0,
+    USED,
+    GUARD_BAND
+} slot_status;
+
 typedef struct connection_request
 {
     uint64_t from_node_id;

@@ -19,9 +19,9 @@ void accumulate_slots(const network_t *network, const path_t *path, dynamic_char
     {
         for (uint64_t j = 0; j < source_arrays[path->nodes[i] * network->node_count + path->nodes[i + 1]].size; j++)
         {
-            if (get_element(source_arrays + path->nodes[i] * network->node_count + path->nodes[i + 1], j))
+            if (get_element(source_arrays + path->nodes[i] * network->node_count + path->nodes[i + 1], j) != UNUSED)
             {
-                set_element(array, j, 1);
+                set_element(array, j, USED);
             }
         }
     }
@@ -31,10 +31,19 @@ void set_slots_on_path(const network_t *network, const path_t *path, dynamic_cha
 {
     for (uint64_t i = 0; i < path->length; i++)
     {
-        for (uint64_t j = start_slot; j <= end_slot; j++)
+        for (uint64_t j = start_slot; j < end_slot; j++)
         {
-            set_element(arrays + path->nodes[i] * network->node_count + path->nodes[i + 1], j, 1);
+            set_element(arrays + path->nodes[i] * network->node_count + path->nodes[i + 1], j, USED);
         }
+        set_element(arrays + path->nodes[i] * network->node_count + path->nodes[i + 1], end_slot, GUARD_BAND);
+    }
+}
+
+void set_slot_usages(const path_t *path, uint64_t start_slot, uint64_t end_slot, uint64_t usages[MAX_SPECTRAL_SLOTS])
+{
+    for (uint64_t i = start_slot; i < end_slot; i++)
+    {
+        usages[i] += path->length;
     }
 }
 
@@ -47,7 +56,7 @@ __ssize_t first_fit_slot_assignment(const network_t *network, const modulation_f
     uint64_t consecutive_slots = 0;
     for (uint64_t i = 0; i < MAX_SPECTRAL_SLOTS; i++)
     {
-        if (!get_element(available_slots, i))
+        if (get_element(available_slots, i) == UNUSED)
         {
             consecutive_slots++;
             if (consecutive_slots >= slot_requirement)
@@ -55,10 +64,6 @@ __ssize_t first_fit_slot_assignment(const network_t *network, const modulation_f
                 assignment_ret->start_slot = i - slot_requirement + 1;
                 assignment_ret->end_slot = i + 1;
                 set_slots_on_path(network, assignment_ret->path, link_slot_usages_ret, assignment_ret->start_slot, assignment_ret->end_slot);
-                for (uint64_t j = assignment_ret->start_slot; j < assignment_ret->end_slot; j++)
-                {
-                    set_element(link_slot_usages_ret, j, 1);
-                }
                 free_dynamic_char_array(available_slots);
                 return i;
             }
@@ -70,6 +75,50 @@ __ssize_t first_fit_slot_assignment(const network_t *network, const modulation_f
     }
     free_dynamic_char_array(available_slots);
     return -1;
+}
+
+uint64_t sum_range(const uint64_t *array, uint64_t start_range, uint64_t end_range)
+{
+    uint64_t sum = 0;
+    for (uint64_t i = start_range; i < end_range; i++)
+        sum += array[i];
+    return sum;
+}
+
+__ssize_t least_used_slot_assignment(const network_t *network, const modulation_format *formats, assignment_t *assignment_ret, dynamic_char_array *link_slot_usages_ret, uint64_t usages[MAX_SPECTRAL_SLOTS])
+{
+    dynamic_char_array *available_slots = new_dynamic_char_array();
+    accumulate_slots(network, assignment_ret->path, link_slot_usages_ret, available_slots);
+
+    __ssize_t least_used_usage = -1, least_used_start_slot = -1;
+    uint64_t slot_requirement = (uint64_t)(formats[assignment_ret->format].channel_bandwidth / FSU_BANDWIDTH + 0.5);
+    uint64_t consecutive_slots = 0;
+    for (uint64_t i = 0; i < MAX_SPECTRAL_SLOTS; i++)
+    {
+        if (get_element(available_slots, i) == UNUSED)
+        {
+            consecutive_slots++;
+            uint64_t usage;
+            if (consecutive_slots >= slot_requirement && ((usage = sum_range(usages, i - slot_requirement + 1, i + 1)) < least_used_usage || least_used_usage == -1))
+            {
+                least_used_usage = usage;
+                least_used_start_slot = i - slot_requirement + 1;
+            }
+        }
+        else
+        {
+            consecutive_slots = 0;
+        }
+    }
+    free_dynamic_char_array(available_slots);
+    if (least_used_start_slot == -1)
+        return -1;
+
+    assignment_ret->start_slot = least_used_start_slot;
+    assignment_ret->end_slot = least_used_start_slot + slot_requirement;
+    set_slots_on_path(network, assignment_ret->path, link_slot_usages_ret, assignment_ret->start_slot, assignment_ret->end_slot);
+    set_slot_usages(assignment_ret->path, assignment_ret->start_slot, assignment_ret->end_slot, usages);
+    return least_used_start_slot;
 }
 
 __ssize_t assign_modulation_format(const modulation_format *formats, uint64_t formats_dim, assignment_t *assignment_ret)
@@ -101,12 +150,18 @@ __ssize_t fixed_shortest_path(const network_t *network, assignment_t *current_as
     {
         return -1;
     }
+    if (*data == NULL)
+    {
+        *data = calloc(MAX_SPECTRAL_SLOTS, sizeof(uint64_t));
+    }
+
+    uint64_t *_data = (uint64_t *)(*data);
 
     __ssize_t leftover_load = request.load;
     assignment_t *assignment = current_assignments + request_index;
+    path_t *assigned_path = find_shortest_path(network, request.from_node_id, request.to_node_id); // Split loads over a single path
     do
     {
-        path_t *assigned_path = find_shortest_path(network, request.from_node_id, request.to_node_id);
         assignment->load = leftover_load;
         assignment->path = assigned_path;
         assignment->is_split = 0;
@@ -123,7 +178,8 @@ __ssize_t fixed_shortest_path(const network_t *network, assignment_t *current_as
             printf("\n\nFAILED TO ASSIGN A PATH\n\n");
         }
 
-        first_fit_slot_assignment(network, formats, assignment, link_slot_usages_ret);
+        // first_fit_slot_assignment(network, formats, assignment, link_slot_usages_ret);
+        least_used_slot_assignment(network, formats, assignment, link_slot_usages_ret, _data);
 
         if (leftover_load)
         {
