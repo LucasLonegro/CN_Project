@@ -22,9 +22,9 @@ typedef int (*link_validator)(const network_t *network, uint64_t from, uint64_t 
 network_t *new_network(uint64_t node_count);
 void free_network(network_t *network);
 
-int set_link_weight(network_t *network, uint64_t nodeid1, uint64_t nodeid2, __ssize_t weight);
+int set_link_weight(network_t *network, uint64_t from, uint64_t to, __ssize_t weight);
 
-__ssize_t get_link_weight(const network_t *network, uint64_t nodeid1, uint64_t nodeid2);
+__ssize_t get_link_weight(const network_t *network, uint64_t from, uint64_t to);
 
 path_t *const *weighted_distances(const network_t *network, uint64_t from);
 path_t *const *unweighted_distances(const network_t *network, uint64_t from);
