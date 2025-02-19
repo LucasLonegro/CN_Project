@@ -1,5 +1,7 @@
 #include "network.h"
 #include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
 
 #define IS_BIT_SET(x, i) (((x)[(i) >> 3] & (1 << ((i) & 7))) != 0)
 #define SET_BIT(x, i) (x)[(i) >> 3] |= (1 << ((i) & 7))
@@ -7,6 +9,23 @@
 
 #define LINK_WEIGHT(n, i1, i2) ((n)->adjacency_matrix[(i1) * (n)->node_count + (i2)])
 #define SET_LINK_WEIGHT(n, i1, i2, w) ((n)->adjacency_matrix[(i1) * (n)->node_count + (i2)] = (w))
+
+int noop_validator(const network_t *network, uint64_t from, uint64_t to, const void *data);
+void print_path(path_t *p, FILE *file)
+{
+    fprintf(file, "\t");
+    fprintf(file, "Length: %ld\t", p->length);
+    fprintf(file, "Distance: %ld\t", p->distance);
+    for (uint64_t j = 0; j <= p->length; j++)
+    {
+        if (p->length == -1 || p->distance == -1)
+            break;
+        fprintf(file, "%ld", p->nodes[j] + 1);
+        if (j != p->length)
+            fprintf(file, "->");
+    }
+    fprintf(file, "\n");
+}
 
 network_t *new_network(uint64_t node_count)
 {
@@ -17,9 +36,232 @@ network_t *new_network(uint64_t node_count)
     network->adjacency_matrix = malloc(sizeof(__ssize_t) * node_count * node_count);
     network->shortest_paths = calloc(node_count, sizeof(path_t *));
     network->shortest_unweighted_paths = calloc(node_count, sizeof(path_t *));
+    network->k_shortest_weighted_paths = calloc(node_count * node_count, sizeof(k_paths));
     for (uint64_t i = 0; i < node_count * node_count; i++)
         network->adjacency_matrix[i] = -1;
     return network;
+}
+
+// only path element must be deallocated
+path_t *subpath(const network_t *network, path_t *path, uint64_t end_node_index_inclusive)
+{
+    path_t *ans = calloc(1, sizeof(path_t));
+    uint64_t distance = 0;
+    for (uint64_t i = 0; i < end_node_index_inclusive && i < path->length; i++)
+    {
+        distance += get_link_weight(network, path->nodes[i], path->nodes[i + 1]);
+    }
+    ans->distance = distance;
+    ans->length = end_node_index_inclusive;
+    ans->nodes = path->nodes;
+    return ans;
+}
+
+// both path element and its nodes must be deallocated
+path_t *merge_paths(const path_t *p1, const path_t *p2)
+{
+    path_t *ans = calloc(1, sizeof(path_t));
+    uint64_t len1 = p1->length == -1 ? 0 : p1->length, len2 = p2->length == -1 ? 0 : p2->length;
+
+    ans->nodes = malloc((len1 + len2 + 1) * sizeof(uint64_t));
+    ans->length = len1 + len2;
+    ans->distance = p1->distance + p2->distance;
+    for (uint64_t i = 0; i < len1; i++)
+    {
+        ans->nodes[i] = p1->nodes[i];
+    }
+    for (uint64_t i = len1; i <= len1 + len2; i++)
+    {
+        ans->nodes[i] = p2->nodes[i - len1];
+    }
+    return ans;
+}
+
+int are_equal_paths(const path_t *p1, const path_t *p2)
+{
+    if (p1->distance != p2->distance || p1->length != p2->length)
+        return 0;
+    for (uint64_t i = 0; i <= p1->length; i++)
+    {
+        if (p1->nodes[i] != p2->nodes[i])
+            return 0;
+    }
+    return 1;
+}
+
+typedef struct removed_elements
+{
+    uint64_t source;
+    char *removed_links;
+    char *removed_nodes;
+} removed_elements;
+
+int is_not_using_removed_elements(const network_t *network, uint64_t from, uint64_t to, const void *data)
+{
+    removed_elements *_data = (removed_elements *)(data);
+    return to != _data->source && !IS_BIT_SET(_data->removed_nodes, from) && !IS_BIT_SET(_data->removed_nodes, to) && !IS_BIT_SET(_data->removed_links, from * network->node_count + to);
+}
+
+uint64_t contains_path(path_t **array, uint64_t array_dim, const path_t *path)
+{
+    for (uint64_t i = 0; i < array_dim; i++)
+        if (are_equal_paths(array[i], path))
+            return 1;
+    return 0;
+}
+
+void sort_by_distance(path_t **array, uint64_t array_dim, int ascending)
+{
+    uint64_t sorted = 0;
+    while (!sorted)
+    {
+        sorted = 1;
+        for (uint64_t i = 0; i < array_dim - 1; i++)
+        {
+            if ((ascending && array[i]->distance > array[i + 1]->distance) || (!ascending && array[i]->distance < array[i + 1]->distance))
+            {
+                sorted = 0;
+                path_t *aux = array[i];
+                array[i] = array[i + 1];
+                array[i + 1] = aux;
+            }
+        }
+    }
+}
+
+// abandon all hope ye who enter here
+path_t **yens_algorithm(network_t *network, uint64_t from, uint64_t to, uint64_t n)
+{
+    path_t **A = calloc(n, sizeof(path_t *));
+    uint64_t A_size = 0;
+    path_t *B[100];
+    uint64_t B_size = 0;
+
+    uint64_t count = 0;
+
+    char *edges_are_removed = calloc(((network->node_count * network->node_count) >> 3) + 1, sizeof(char));
+    char *nodes_are_removed = calloc((network->node_count >> 3) + 1, sizeof(char));
+    removed_elements data = {.removed_links = edges_are_removed, .removed_nodes = nodes_are_removed, .source = from};
+
+    path_t **aux = modified_weighted_distances(network, from, noop_validator, NULL);
+    for (uint64_t i = 0; i < network->node_count; i++)
+        if (i != to)
+        {
+            free(aux[i]->nodes);
+            free(aux[i]);
+        }
+    A[0] = aux[to];
+    A_size = 1;
+
+    for (uint64_t k = 0; k < n - 1; k++)
+    {
+        for (uint64_t i = 0; i < A[k]->length; i++)
+        {
+            uint64_t spur_node = A[k]->nodes[i];
+            path_t *root_path = subpath(network, A[k], i);
+
+            for (uint64_t path_index = 0; path_index < A_size; path_index++)
+            {
+                path_t *aux = subpath(network, A[path_index], i);
+                if (are_equal_paths(root_path, aux))
+                {
+                    SET_BIT(edges_are_removed, A[path_index]->nodes[i] * network->node_count + A[path_index]->nodes[i + 1]);
+                }
+                free(aux);
+            }
+            for (uint64_t node_index = 1; node_index <= root_path->length; node_index++)
+            {
+                if (root_path->nodes[node_index] != spur_node)
+                {
+                    SET_BIT(nodes_are_removed, root_path->nodes[node_index]);
+                }
+            }
+
+            path_t **spur_paths_aux = modified_weighted_distances(network, spur_node, is_not_using_removed_elements, (void *)&data);
+            for (uint64_t i = 0; i < network->node_count; i++)
+                if (i != to)
+                {
+                    free(spur_paths_aux[i]->nodes);
+                    free(spur_paths_aux[i]);
+                }
+            path_t *spur_path = spur_paths_aux[to];
+            memset(edges_are_removed, 0, (((network->node_count * network->node_count) >> 3) + 1) * sizeof(char));
+            memset(nodes_are_removed, 0, (((network->node_count) >> 3) + 1) * sizeof(char));
+
+            if (spur_path->length == -1 || spur_path->distance == -1)
+            {
+                free(spur_path->nodes);
+                free(spur_path);
+                free(spur_paths_aux);
+                free(root_path);
+                continue;
+            }
+
+            path_t *total_path = merge_paths(root_path, spur_path);
+            free(spur_path->nodes);
+            free(spur_path);
+            free(spur_paths_aux);
+            free(root_path);
+
+            if (!contains_path(B, B_size, total_path))
+            {
+                B[B_size++] = total_path;
+                count++;
+            }
+            else
+            {
+                free(total_path->nodes);
+                free(total_path);
+            }
+        }
+        if (B_size == 0)
+        {
+            break;
+        }
+
+        sort_by_distance(B, B_size, 0);
+        A[A_size++] = B[--B_size];
+    }
+    for (uint64_t i = 0; i < B_size; i++)
+    {
+        if (!contains_path(A, A_size, B[i]))
+        {
+            free(B[i]->nodes);
+            free(B[i]);
+        }
+    }
+    free(aux);
+    free(nodes_are_removed);
+    free(edges_are_removed);
+    return A;
+}
+
+// I shall dub you the memory fragmentator
+path_t *const *k_shortest_paths(network_t *network, uint64_t from, uint64_t to, uint64_t k)
+{
+    if (network->k_shortest_weighted_paths[from * network->node_count + to].k != 0)
+    {
+        printf("HERE\n");
+        if (network->k_shortest_weighted_paths[from * network->node_count + to].k >= k)
+            return network->k_shortest_weighted_paths[from * network->node_count + to].paths;
+        else
+        {
+            for (uint64_t i = 0; i < network->node_count; i++)
+            {
+                if (network->k_shortest_weighted_paths[from * network->node_count + to].paths[i] != NULL)
+                {
+                    free(network->k_shortest_weighted_paths[from * network->node_count + to].paths[i]->nodes);
+                    free(network->k_shortest_weighted_paths[from * network->node_count + to].paths[i]);
+                }
+            }
+            free(network->k_shortest_weighted_paths[from * network->node_count + to].paths);
+        }
+    }
+    printf("HEREINSTEAD: %ld\n", network->k_shortest_weighted_paths[from * network->node_count + to].k);
+    path_t **k_paths = yens_algorithm(network, from, to, k);
+    network->k_shortest_weighted_paths[from * network->node_count + to].k = k;
+    network->k_shortest_weighted_paths[from * network->node_count + to].paths = k_paths;
+    return k_paths;
 }
 
 void free_network(network_t *network)
@@ -45,6 +287,22 @@ void free_network(network_t *network)
             free(network->shortest_unweighted_paths[i]);
         }
     }
+    for (uint64_t i = 0; i < network->node_count * network->node_count; i++)
+    {
+        if (network->k_shortest_weighted_paths[i].k != 0)
+        {
+            for (uint64_t j = 0; j < network->k_shortest_weighted_paths[i].k; j++)
+            {
+                if (network->k_shortest_weighted_paths[i].paths[j] != NULL)
+                {
+                    free(network->k_shortest_weighted_paths[i].paths[j]->nodes);
+                    free(network->k_shortest_weighted_paths[i].paths[j]);
+                }
+            }
+            free(network->k_shortest_weighted_paths[i].paths);
+        }
+    }
+    free(network->k_shortest_weighted_paths);
     free(network->shortest_paths);
     free(network->shortest_unweighted_paths);
     free(network->adjacency_matrix);

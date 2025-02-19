@@ -148,6 +148,8 @@ __ssize_t fixed_shortest_path(const network_t *network, assignment_t *current_as
 
     if (request_index >= request_count)
     {
+        if (*data != NULL)
+            free(*data);
         return -1;
     }
     if (*data == NULL)

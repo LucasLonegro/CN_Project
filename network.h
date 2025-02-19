@@ -9,12 +9,19 @@ typedef struct path_t
     __ssize_t distance;
 } path_t;
 
+typedef struct k_paths
+{
+    uint64_t k;
+    path_t **paths;
+} k_paths;
+
 typedef struct network_t
 {
     uint64_t node_count;
     __ssize_t *adjacency_matrix;
     path_t ***shortest_paths;
     path_t ***shortest_unweighted_paths;
+    k_paths *k_shortest_weighted_paths;
 } network_t;
 
 typedef int (*link_validator)(const network_t *network, uint64_t from, uint64_t to, const void *data);
@@ -28,6 +35,7 @@ __ssize_t get_link_weight(const network_t *network, uint64_t from, uint64_t to);
 
 path_t *const *weighted_distances(const network_t *network, uint64_t from);
 path_t *const *unweighted_distances(const network_t *network, uint64_t from);
+path_t *const *k_shortest_paths(network_t *network, uint64_t from, uint64_t to, uint64_t k);
 
 path_t **modified_weighted_distances(const network_t *network, uint64_t from, link_validator validator, void *data);
 
