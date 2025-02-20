@@ -163,7 +163,7 @@ path_t *find_least_maximally_loaded_path_modified(const network_t *network, uint
     path_t *const *k_paths = k_shortest_paths(network, from_node_id, to_node_id, K);
     uint64_t best_path_index = 0;
     double best_path_max_load_ratio = -1;
-    for (uint64_t i = 0; i < K; i++)
+    for (uint64_t i = 0; i < K && k_paths[i] != NULL; i++)
     {
         double max_path_load_ratio = most_loaded_link(network, k_paths[i], loads) + k_paths[i]->length * LENGTH_LOAD_PONDERATION;
         if (max_path_load_ratio < best_path_max_load_ratio || best_path_max_load_ratio == -1)
