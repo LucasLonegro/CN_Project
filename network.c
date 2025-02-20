@@ -91,15 +91,19 @@ int are_equal_paths(const path_t *p1, const path_t *p2)
 
 typedef struct removed_elements
 {
-    uint64_t source;
+    path_t *path;
     char *removed_links;
     char *removed_nodes;
 } removed_elements;
 
-int is_not_using_removed_elements(const network_t *network, uint64_t from, uint64_t to, const void *data)
+int is_not_using_removed_elements_and_does_not_revisit_nodes(const network_t *network, uint64_t from, uint64_t to, const void *data)
 {
     removed_elements *_data = (removed_elements *)(data);
-    return to != _data->source && !IS_BIT_SET(_data->removed_nodes, from) && !IS_BIT_SET(_data->removed_nodes, to) && !IS_BIT_SET(_data->removed_links, from * network->node_count + to);
+    if (_data->path != NULL)
+        for (uint64_t i = 0; i <= _data->path->length; i++)
+            if (to == _data->path->nodes[i])
+                return 0;
+    return !IS_BIT_SET(_data->removed_nodes, from) && !IS_BIT_SET(_data->removed_nodes, to) && !IS_BIT_SET(_data->removed_links, from * network->node_count + to);
 }
 
 uint64_t contains_path(path_t **array, uint64_t array_dim, const path_t *path)
@@ -141,7 +145,7 @@ path_t **yens_algorithm(network_t *network, uint64_t from, uint64_t to, uint64_t
 
     char *edges_are_removed = calloc(((network->node_count * network->node_count) >> 3) + 1, sizeof(char));
     char *nodes_are_removed = calloc((network->node_count >> 3) + 1, sizeof(char));
-    removed_elements data = {.removed_links = edges_are_removed, .removed_nodes = nodes_are_removed, .source = from};
+    removed_elements data = {.removed_links = edges_are_removed, .removed_nodes = nodes_are_removed};
 
     path_t **aux = modified_weighted_distances(network, from, noop_validator, NULL);
     for (uint64_t i = 0; i < network->node_count; i++)
@@ -176,8 +180,10 @@ path_t **yens_algorithm(network_t *network, uint64_t from, uint64_t to, uint64_t
                     SET_BIT(nodes_are_removed, root_path->nodes[node_index]);
                 }
             }
-
-            path_t **spur_paths_aux = modified_weighted_distances(network, spur_node, is_not_using_removed_elements, (void *)&data);
+            path_t *subpath_to_spur_node = subpath(network, A[k], i);
+            data.path = subpath_to_spur_node;
+            path_t **spur_paths_aux = modified_weighted_distances(network, spur_node, is_not_using_removed_elements_and_does_not_revisit_nodes, (void *)&data);
+            free(subpath_to_spur_node);
             for (uint64_t i = 0; i < network->node_count; i++)
                 if (i != to)
                 {
@@ -241,7 +247,6 @@ path_t *const *k_shortest_paths(network_t *network, uint64_t from, uint64_t to, 
 {
     if (network->k_shortest_weighted_paths[from * network->node_count + to].k != 0)
     {
-        printf("HERE\n");
         if (network->k_shortest_weighted_paths[from * network->node_count + to].k >= k)
             return network->k_shortest_weighted_paths[from * network->node_count + to].paths;
         else
@@ -257,7 +262,6 @@ path_t *const *k_shortest_paths(network_t *network, uint64_t from, uint64_t to, 
             free(network->k_shortest_weighted_paths[from * network->node_count + to].paths);
         }
     }
-    printf("HEREINSTEAD: %ld\n", network->k_shortest_weighted_paths[from * network->node_count + to].k);
     path_t **k_paths = yens_algorithm(network, from, to, k);
     network->k_shortest_weighted_paths[from * network->node_count + to].k = k;
     network->k_shortest_weighted_paths[from * network->node_count + to].paths = k_paths;
