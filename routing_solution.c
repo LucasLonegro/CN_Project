@@ -5,7 +5,7 @@
 
 #define K 5
 
-typedef __ssize_t (*new_assigner)(const network_t *network, assignment_t *current_assignments, connection_request request, uint64_t request_index, uint64_t request_count, const modulation_format *formats, uint64_t formats_dim, void **data, dynamic_char_array *link_slot_usages_ret);
+typedef __ssize_t (*assigner)(const network_t *network, assignment_t *current_assignments, connection_request request, uint64_t request_index, uint64_t request_count, const modulation_format *formats, uint64_t formats_dim, void **data, dynamic_char_array *link_slot_usages_ret);
 
 path_t *find_shortest_path(const network_t *network, uint64_t from_node_id, uint64_t to_node_id)
 {
@@ -315,7 +315,7 @@ __ssize_t fixed_shortest_path(const network_t *network, assignment_t *current_as
     return request_index + 1;
 }
 
-void run_routing_algorithm(const network_t *network, connection_request *requests, uint64_t requests_dim, const modulation_format *formats, uint64_t formats_dim, new_assigner algorithm, assignment_t *assignments_ret, dynamic_char_array *link_slot_usages_ret)
+void run_routing_algorithm(const network_t *network, connection_request *requests, uint64_t requests_dim, const modulation_format *formats, uint64_t formats_dim, assigner algorithm, assignment_t *assignments_ret, dynamic_char_array *link_slot_usages_ret)
 {
     void *data = NULL;
     uint64_t index = 0;
@@ -328,6 +328,6 @@ void run_routing_algorithm(const network_t *network, connection_request *request
 
 void generate_routing(const network_t *network, connection_request *requests, uint64_t requests_dim, const modulation_format *formats, uint64_t formats_dim, assignment_t *assignments_ret, dynamic_char_array *link_slot_usages_ret, routing_algorithms algorithm)
 {
-    new_assigner routing_algorithm = algorithm == FIXED_SHORTEST_PATH ? fixed_shortest_path : least_used_path;
+    assigner routing_algorithm = algorithm == FIXED_SHORTEST_PATH ? fixed_shortest_path : least_used_path;
     run_routing_algorithm(network, requests, requests_dim, formats, formats_dim, routing_algorithm, assignments_ret, link_slot_usages_ret);
 }
