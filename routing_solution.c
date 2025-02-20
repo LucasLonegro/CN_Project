@@ -194,8 +194,8 @@ path_t *find_least_maximally_loaded_path(const network_t *network, uint64_t from
 
 typedef struct usages_and_loads
 {
-    uint64_t *usages;
     uint64_t *loads;
+    uint64_t *usages;
 } usages_and_loads;
 
 __ssize_t least_used_path(const network_t *network, assignment_t *current_assignments, connection_request request, uint64_t request_index, uint64_t request_count, const modulation_format *formats, uint64_t formats_dim, void **data, dynamic_char_array *link_slot_usages_ret)
@@ -205,8 +205,8 @@ __ssize_t least_used_path(const network_t *network, assignment_t *current_assign
     {
         if (*data != NULL)
         {
-            free(_data->loads);
             free(_data->usages);
+            free(_data->loads);
             free(*data);
         }
         return -1;
@@ -215,13 +215,13 @@ __ssize_t least_used_path(const network_t *network, assignment_t *current_assign
     {
         *data = calloc(1, sizeof(usages_and_loads));
         _data = (usages_and_loads *)*data;
-        _data->loads = calloc(MAX_SPECTRAL_SLOTS, sizeof(uint64_t));
-        _data->usages = calloc(network->node_count * network->node_count, sizeof(uint64_t));
+        _data->usages = calloc(MAX_SPECTRAL_SLOTS, sizeof(uint64_t));
+        _data->loads = calloc(network->node_count * network->node_count, sizeof(uint64_t));
     }
 
     __ssize_t leftover_load = request.load;
     assignment_t *assignment = current_assignments + request_index;
-    path_t *assigned_path = find_least_maximally_loaded_path_modified(network, request.from_node_id, request.to_node_id, _data->usages); // Split loads over a single path
+    path_t *assigned_path = find_least_maximally_loaded_path_modified(network, request.from_node_id, request.to_node_id, _data->loads); // Split loads over a single path
     do
     {
         assignment->load = leftover_load;
@@ -229,7 +229,7 @@ __ssize_t least_used_path(const network_t *network, assignment_t *current_assign
         assignment->is_split = 0;
         for (uint64_t i = 0; i < assignment->path->length; i++)
         {
-            _data->usages[assignment->path->nodes[i] * network->node_count + assignment->path->nodes[i + 1]] += assignment->load;
+            _data->loads[assignment->path->nodes[i] * network->node_count + assignment->path->nodes[i + 1]] += assignment->load;
         }
 
         if (assigned_path->length == -1)
@@ -245,7 +245,7 @@ __ssize_t least_used_path(const network_t *network, assignment_t *current_assign
         }
 
         // first_fit_slot_assignment(network, formats, assignment, link_slot_usages_ret);
-        least_used_slot_assignment(network, formats, assignment, link_slot_usages_ret, _data->loads);
+        least_used_slot_assignment(network, formats, assignment, link_slot_usages_ret, _data->usages);
 
         if (leftover_load)
         {
