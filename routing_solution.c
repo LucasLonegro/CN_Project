@@ -158,6 +158,23 @@ uint64_t most_loaded_link(const network_t *network, const path_t *path, uint64_t
     return max_load;
 }
 
+path_t *find_least_maximally_loaded_path_modified(const network_t *network, uint64_t from_node_id, uint64_t to_node_id, uint64_t *loads)
+{
+    path_t *const *k_paths = k_shortest_paths(network, from_node_id, to_node_id, K);
+    uint64_t best_path_index = 0;
+    double best_path_max_load_ratio = -1;
+    for (uint64_t i = 0; i < K; i++)
+    {
+        double max_path_load_ratio = most_loaded_link(network, k_paths[i], loads) + k_paths[i]->length * LENGTH_LOAD_PONDERATION;
+        if (max_path_load_ratio < best_path_max_load_ratio || best_path_max_load_ratio == -1)
+        {
+            best_path_max_load_ratio = max_path_load_ratio;
+            best_path_index = i;
+        }
+    }
+    return k_paths[best_path_index];
+}
+
 path_t *find_least_maximally_loaded_path(const network_t *network, uint64_t from_node_id, uint64_t to_node_id, uint64_t *loads)
 {
     path_t *const *k_paths = k_shortest_paths(network, from_node_id, to_node_id, K);
@@ -204,7 +221,7 @@ __ssize_t least_used_path(const network_t *network, assignment_t *current_assign
 
     __ssize_t leftover_load = request.load;
     assignment_t *assignment = current_assignments + request_index;
-    path_t *assigned_path = find_least_maximally_loaded_path(network, request.from_node_id, request.to_node_id, _data->usages); // Split loads over a single path
+    path_t *assigned_path = find_least_maximally_loaded_path_modified(network, request.from_node_id, request.to_node_id, _data->usages); // Split loads over a single path
     do
     {
         assignment->load = leftover_load;

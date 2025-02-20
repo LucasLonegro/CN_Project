@@ -4,6 +4,9 @@
 #include "problem.h"
 #include "utils.h"
 
+// Increase to give greater weight to number of links in path vs load when ranking paths in least_used_path algorithm
+#define LENGTH_LOAD_PONDERATION 1000.0
+
 typedef enum slot_status
 {
     UNUSED = 0,
