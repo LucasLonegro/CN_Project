@@ -35,7 +35,7 @@ __ssize_t get_link_weight(const network_t *network, uint64_t from, uint64_t to);
 
 path_t *const *weighted_distances(const network_t *network, uint64_t from);
 path_t *const *unweighted_distances(const network_t *network, uint64_t from);
-path_t *const *k_shortest_paths(network_t *network, uint64_t from, uint64_t to, uint64_t k);
+path_t *const *k_shortest_paths(const network_t *network, uint64_t from, uint64_t to, uint64_t k);
 
 path_t **modified_weighted_distances(const network_t *network, uint64_t from, link_validator validator, void *data);
 

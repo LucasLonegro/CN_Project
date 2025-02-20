@@ -134,7 +134,7 @@ void sort_by_distance(path_t **array, uint64_t array_dim, int ascending)
 }
 
 // abandon all hope ye who enter here
-path_t **yens_algorithm(network_t *network, uint64_t from, uint64_t to, uint64_t n)
+path_t **yens_algorithm(const network_t *network, uint64_t from, uint64_t to, uint64_t n)
 {
     path_t **A = calloc(n, sizeof(path_t *));
     uint64_t A_size = 0;
@@ -243,7 +243,7 @@ path_t **yens_algorithm(network_t *network, uint64_t from, uint64_t to, uint64_t
 }
 
 // I shall dub you the memory fragmentator
-path_t *const *k_shortest_paths(network_t *network, uint64_t from, uint64_t to, uint64_t k)
+path_t *const *k_shortest_paths(const network_t *network, uint64_t from, uint64_t to, uint64_t k)
 {
     if (network->k_shortest_weighted_paths[from * network->node_count + to].k != 0)
     {
