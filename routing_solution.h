@@ -20,6 +20,17 @@ typedef enum routing_algorithms
     LEAST_USED_PATH
 } routing_algorithms;
 
+typedef enum slot_assignment_algorithms
+{
+    LEAST_USED_SLOT,
+    FIRST_FIT_SLOT
+} slot_assignment_algorithms;
+
+typedef enum modulation_format_assignment_algorithms
+{
+    DEFAULT,
+} modulation_format_assignment_algorithms;
+
 typedef struct connection_request
 {
     uint64_t from_node_id;
@@ -38,6 +49,6 @@ typedef struct assignment_t
     struct assignment_t *split;
 } assignment_t;
 
-void generate_routing(const network_t *network, connection_request *requests, uint64_t requests_dim, const modulation_format *formats, uint64_t formats_dim, assignment_t *assignments_ret, dynamic_char_array *link_slot_usages_ret, routing_algorithms algorithm);
+void generate_routing(const network_t *network, connection_request *requests, uint64_t requests_dim, const modulation_format *formats, uint64_t formats_dim, assignment_t *assignments_ret, dynamic_char_array *link_slot_usages_ret, routing_algorithms routing_algorithm, slot_assignment_algorithms slot_assigner_algorithm, modulation_format_assignment_algorithms format_assigner);
 
 #endif
