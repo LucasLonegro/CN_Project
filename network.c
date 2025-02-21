@@ -137,7 +137,7 @@ path_t **yens_algorithm(const network_t *network, uint64_t from, uint64_t to, ui
 {
     path_t **A = calloc(n, sizeof(path_t *));
     uint64_t A_size = 0;
-    path_t *B[100];
+    path_t **B = calloc((n + 1) * network->node_count, sizeof(path_t));
     uint64_t B_size = 0;
 
     uint64_t count = 0;
@@ -235,6 +235,7 @@ path_t **yens_algorithm(const network_t *network, uint64_t from, uint64_t to, ui
             free(B[i]);
         }
     }
+    free(B);
     free(aux);
     free(nodes_are_removed);
     free(edges_are_removed);
