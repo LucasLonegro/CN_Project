@@ -145,7 +145,7 @@ void run_solution(uint64_t topology_node_count, uint64_t links[][3], uint64_t li
 
     dynamic_char_array *used_frequency_slots = calloc(topology_node_count * topology_node_count, sizeof(dynamic_char_array));
 
-    generate_routing(network, requests, requests_count, formats, MODULATION_FORMATS_DIM, assignments, used_frequency_slots, FIXED_SHORTEST_PATH, FIRST_FIT_SLOT, DEFAULT);
+    generate_routing(network, requests, requests_count, formats, MODULATION_FORMATS_DIM, assignments, used_frequency_slots, LEAST_USED_PATH, LEAST_USED_SLOT, DEFAULT);
 
     uint64_t *total_link_loads = calloc(topology_node_count * topology_node_count, sizeof(uint64_t));
     for (uint64_t i = 0; i < requests_count; i++)

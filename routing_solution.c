@@ -212,43 +212,71 @@ void run_assignment(const network_t *network, assignment_t *current_assignments,
     {
         connection_request request = requests[request_index];
 
-        __ssize_t leftover_load = request.load;
         assignment_t *assignment = current_assignments + request_index;
         path_t *assigned_path = router(network, request.from_node_id, request.to_node_id, loads); // Split loads over a single path
+        assignment->path = assigned_path;
+        if (assigned_path->length == -1)
+        {
+            printf("\n\nFAILED TO ASSIGN A PATH\n\n");
+        }
+        else
+        {
+            for (uint64_t i = 0; i < assignment->path->length; i++)
+            {
+                loads[assignment->path->nodes[i] * network->node_count + assignment->path->nodes[i + 1]] += request.load;
+            }
+        }
+    }
+
+    for (uint64_t request_index = 0; request_index < request_count; request_index++)
+    {
+        connection_request request = requests[request_index];
+
+        __ssize_t leftover_load = request.load;
+        assignment_t *assignment = current_assignments + request_index;
         do
         {
             assignment->load = leftover_load;
-            assignment->path = assigned_path;
             assignment->is_split = 0;
-            for (uint64_t i = 0; i < assignment->path->length; i++)
-            {
-                loads[assignment->path->nodes[i] * network->node_count + assignment->path->nodes[i + 1]] += assignment->load;
-            }
-
-            if (assigned_path->length == -1)
-            {
-                printf("\n\nFAILED TO ASSIGN A PATH\n\n");
-            }
 
             leftover_load = modulator(formats, formats_dim, assignment);
 
             if (leftover_load == -1)
             {
-                printf("\n\nFAILED TO ASSIGN A PATH\n\n");
+                printf("\n\nFAILED TO ASSIGN A MODULATION FORMAT\n\n");
             }
-
-            slotter(network, formats, assignment, link_slot_usages_ret, usages);
 
             if (leftover_load)
             {
                 assignment_t *split_assignment = calloc(1, sizeof(assignment_t));
                 assignment->split = split_assignment;
                 assignment->is_split = 1;
+                split_assignment->path = assignment->path;
                 split_assignment->is_split = 0;
 
                 assignment = split_assignment;
             }
         } while (leftover_load);
+    }
+
+    for (uint64_t request_index = 0; request_index < request_count; request_index++)
+    {
+
+        assignment_t *assignment = current_assignments + request_index;
+        while (assignment != NULL)
+        {
+
+            slotter(network, formats, assignment, link_slot_usages_ret, usages);
+
+            if (assignment->is_split)
+            {
+                assignment = assignment->split;
+            }
+            else
+            {
+                assignment = NULL;
+            }
+        }
     }
     free(usages);
     free(loads);
