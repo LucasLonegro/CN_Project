@@ -130,7 +130,7 @@ void run_solution(uint64_t topology_node_count, uint64_t links[][3], uint64_t li
     {
         for (uint64_t j = 0; j < topology_node_count; j++)
         {
-            if (connection_requests[i] > 0 && i != j)
+            if (connection_requests[i * topology_node_count + j] > 0 && i != j)
             {
                 requests[requests_count].load = connection_requests[i * topology_node_count + j];
                 requests[requests_count].from_node_id = i;
