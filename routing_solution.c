@@ -336,6 +336,57 @@ void run_LML_routing(const network_t *network, connection_request *requests, uin
     free(loads);
 }
 
+void highest_load(const network_t *network, uint64_t *loads, uint64_t *from_node_ret, uint64_t *to_node_ret)
+{
+    uint64_t max_load = 0;
+    for (uint64_t i = 0; i < network->node_count; i++)
+    {
+        for (uint64_t j = 0; j < network->node_count; j++)
+        {
+            if (loads[network->node_count * i + j] > max_load)
+            {
+                max_load = loads[network->node_count * i + j];
+                *from_node_ret = i;
+                *to_node_ret = j;
+            }
+        }
+    }
+}
+
+int contains_link(const network_t *network, uint64_t from, uint64_t to, const path_t *path)
+{
+    for (uint64_t i = 0; i < path->length; i++)
+    {
+        if (path->nodes[i] == from && path->nodes[i + 1] == to)
+            return 1;
+    }
+    return 0;
+}
+
+void change_path(const network_t *network, assignment_t *assignment, uint64_t *loads, uint64_t path_load, const path_t *new_path)
+{
+    for (uint64_t i = 0; i < assignment->path->length; i++)
+    {
+        loads[assignment->path->nodes[i] * network->node_count + assignment->path->nodes[i + 1]] -= path_load;
+    }
+
+    assignment->path = new_path;
+    // print_path(assignment->path, stdout);
+    for (uint64_t i = 0; i < assignment->path->length; i++)
+    {
+        loads[assignment->path->nodes[i] * network->node_count + assignment->path->nodes[i + 1]] += path_load;
+    }
+}
+
+uint64_t assignment_load(const assignment_t *assignment)
+{
+    if (assignment->is_split)
+    {
+        return assignment->load + assignment_load(assignment->split);
+    }
+    return assignment->load;
+}
+
 void run_LML_routing_modified(const network_t *network, connection_request *requests, uint64_t request_count, assignment_t *assignments_ret)
 {
     uint64_t *loads = calloc(network->node_count * network->node_count, sizeof(uint64_t));
@@ -375,6 +426,7 @@ void run_LML_routing_modified(const network_t *network, connection_request *requ
             {
                 uint64_t candidate_load = requests[i].load;
                 const path_t *alternative_path = find_least_maximally_loaded_path_modified(network, assignments_ret[i].path->nodes[0], assignments_ret[i].path->nodes[assignments_ret[i].path->length], loads); // Split loads over a single path
+                                                                                                                                                                                                                //     print_path(alternative_path, stdout);
                 uint64_t alternative_path_maximal_load = most_loaded_link(network, alternative_path, loads);
                 __ssize_t reduction = +highest_load_value - alternative_path_maximal_load - candidate_load;
                 if (reduction > max_reduction)
@@ -396,57 +448,6 @@ void run_LML_routing_modified(const network_t *network, connection_request *requ
 
     free(loads);
 }
-
-void highest_load(const network_t *network, uint64_t *loads, uint64_t *from_node_ret, uint64_t *to_node_ret)
-{
-    uint64_t max_load = 0;
-    for (uint64_t i = 0; i < network->node_count; i++)
-    {
-        for (uint64_t j = 0; j < network->node_count; j++)
-        {
-            if (loads[network->node_count * i + j] > max_load)
-            {
-                max_load = loads[network->node_count * i + j];
-                *from_node_ret = i;
-                *to_node_ret = j;
-            }
-        }
-    }
-}
-
-int contains_link(const network_t *network, uint64_t from, uint64_t to, const path_t *path)
-{
-    for (uint64_t i = 0; i < path->length; i++)
-    {
-        if (path->nodes[i] == from && path->nodes[i + 1] == to)
-            return 1;
-    }
-    return 0;
-}
-
-void change_path(const network_t *network, assignment_t *assignment, uint64_t *loads, uint64_t path_load, const path_t *new_path)
-{
-    for (uint64_t i = 0; i < assignment->path->length; i++)
-    {
-        loads[assignment->path->nodes[i] * network->node_count + assignment->path->nodes[i + 1]] -= path_load;
-    }
-
-    assignment->path = new_path;
-    for (uint64_t i = 0; i < assignment->path->length; i++)
-    {
-        loads[assignment->path->nodes[i] * network->node_count + assignment->path->nodes[i + 1]] += path_load;
-    }
-}
-
-uint64_t assignment_load(const assignment_t *assignment)
-{
-    if (assignment->is_split)
-    {
-        return assignment->load + assignment_load(assignment->split);
-    }
-    return assignment->load;
-}
-
 
 void run_assignment(const network_t *network, assignment_t *assignments_ret, connection_request *requests, uint64_t request_count, const modulation_format *formats, uint64_t formats_dim, dynamic_char_array *link_slot_usages_ret, routing_assigner router, slot_assigner slotter, modulation_assigner modulator)
 {
