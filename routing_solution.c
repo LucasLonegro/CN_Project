@@ -200,40 +200,20 @@ path_t *find_least_maximally_loaded_path(const network_t *network, uint64_t from
     return k_paths[best_path_index];
 }
 
-typedef path_t *(*routing_assigner)(const network_t *network, uint64_t from_node_id, uint64_t to_node_id, uint64_t *loads);
-typedef __ssize_t (*modulation_assigner)(const modulation_format *formats, uint64_t formats_dim, assignment_t *assignment_ret);
-typedef __ssize_t (*slot_assigner)(const network_t *network, const modulation_format *formats, assignment_t *assignment_ret, dynamic_char_array *link_slot_usages_ret, uint64_t usages[MAX_SPECTRAL_SLOTS]);
+typedef __ssize_t (*modulator_algorith)(const modulation_format *formats, uint64_t formats_dim, assignment_t *assignment_ret);
 
-void run_assignment(const network_t *network, assignment_t *current_assignments, connection_request *requests, uint64_t request_count, const modulation_format *formats, uint64_t formats_dim, dynamic_char_array *link_slot_usages_ret, routing_assigner router, slot_assigner slotter, modulation_assigner modulator)
+typedef void (*routing_assigner)(const network_t *network, connection_request *requests, uint64_t request_count, assignment_t *assignments_ret);
+typedef void (*modulation_assigner)(const network_t *network, connection_request *requests, uint64_t request_count, assignment_t *assignments_ret, const modulation_format *formats, uint64_t formats_dim);
+typedef void (*slot_assigner)(const network_t *network, const modulation_format *formats, assignment_t *assignments_ret, uint64_t request_count, dynamic_char_array *link_slot_usages_ret);
+
+void run_modulator(const network_t *network, connection_request *requests, uint64_t request_count, assignment_t *assignments_ret, const modulation_format *formats, uint64_t formats_dim, modulator_algorith modulator)
 {
-    uint64_t *usages = calloc(MAX_SPECTRAL_SLOTS, sizeof(uint64_t));
-    uint64_t *loads = calloc(network->node_count * network->node_count, sizeof(uint64_t));
-    for (uint64_t request_index = 0; request_index < request_count; request_index++)
-    {
-        connection_request request = requests[request_index];
-
-        assignment_t *assignment = current_assignments + request_index;
-        path_t *assigned_path = router(network, request.from_node_id, request.to_node_id, loads); // Split loads over a single path
-        assignment->path = assigned_path;
-        if (assigned_path->length == -1)
-        {
-            printf("\n\nFAILED TO ASSIGN A PATH\n\n");
-        }
-        else
-        {
-            for (uint64_t i = 0; i < assignment->path->length; i++)
-            {
-                loads[assignment->path->nodes[i] * network->node_count + assignment->path->nodes[i + 1]] += request.load;
-            }
-        }
-    }
-
     for (uint64_t request_index = 0; request_index < request_count; request_index++)
     {
         connection_request request = requests[request_index];
 
         __ssize_t leftover_load = request.load;
-        assignment_t *assignment = current_assignments + request_index;
+        assignment_t *assignment = assignments_ret + request_index;
         do
         {
             assignment->load = leftover_load;
@@ -258,15 +238,25 @@ void run_assignment(const network_t *network, assignment_t *current_assignments,
             }
         } while (leftover_load);
     }
+}
+
+void run_default_modulator(const network_t *network, connection_request *requests, uint64_t request_count, assignment_t *assignments_ret, const modulation_format *formats, uint64_t formats_dim)
+{
+    return run_modulator(network, requests, request_count, assignments_ret, formats, formats_dim, assign_modulation_format);
+}
+
+void run_LUS_slotting(const network_t *network, const modulation_format *formats, assignment_t *assignments_ret, uint64_t request_count, dynamic_char_array *link_slot_usages_ret)
+{
+    uint64_t *usages = calloc(MAX_SPECTRAL_SLOTS, sizeof(uint64_t));
 
     for (uint64_t request_index = 0; request_index < request_count; request_index++)
     {
 
-        assignment_t *assignment = current_assignments + request_index;
+        assignment_t *assignment = assignments_ret + request_index;
         while (assignment != NULL)
         {
 
-            slotter(network, formats, assignment, link_slot_usages_ret, usages);
+            least_used_slot_assignment(network, formats, assignment, link_slot_usages_ret, usages);
 
             if (assignment->is_split)
             {
@@ -278,14 +268,86 @@ void run_assignment(const network_t *network, assignment_t *current_assignments,
             }
         }
     }
+
     free(usages);
+}
+
+void run_FFS_slotting(const network_t *network, const modulation_format *formats, assignment_t *assignments_ret, uint64_t request_count, dynamic_char_array *link_slot_usages_ret)
+{
+    for (uint64_t request_index = 0; request_index < request_count; request_index++)
+    {
+
+        assignment_t *assignment = assignments_ret + request_index;
+        while (assignment != NULL)
+        {
+
+            first_fit_slot_assignment(network, formats, assignment, link_slot_usages_ret);
+
+            if (assignment->is_split)
+            {
+                assignment = assignment->split;
+            }
+            else
+            {
+                assignment = NULL;
+            }
+        }
+    }
+}
+
+void run_SPF_routing(const network_t *network, connection_request *requests, uint64_t request_count, assignment_t *assignments_ret)
+{
+    for (uint64_t request_index = 0; request_index < request_count; request_index++)
+    {
+        connection_request request = requests[request_index];
+
+        assignment_t *assignment = assignments_ret + request_index;
+        path_t *assigned_path = find_shortest_path(network, request.from_node_id, request.to_node_id); // Split loads over a single path
+        assignment->path = assigned_path;
+        if (assigned_path->length == -1)
+        {
+            printf("\n\nFAILED TO ASSIGN A PATH\n\n");
+        }
+    }
+}
+
+void run_LML_routing(const network_t *network, connection_request *requests, uint64_t request_count, assignment_t *assignments_ret)
+{
+    uint64_t *loads = calloc(network->node_count * network->node_count, sizeof(uint64_t));
+    for (uint64_t request_index = 0; request_index < request_count; request_index++)
+    {
+        connection_request request = requests[request_index];
+
+        assignment_t *assignment = assignments_ret + request_index;
+        path_t *assigned_path = find_least_maximally_loaded_path_modified(network, request.from_node_id, request.to_node_id, loads); // Split loads over a single path
+        assignment->path = assigned_path;
+        if (assigned_path->length == -1)
+        {
+            printf("\n\nFAILED TO ASSIGN A PATH\n\n");
+        }
+        else
+        {
+            for (uint64_t i = 0; i < assignment->path->length; i++)
+            {
+                loads[assignment->path->nodes[i] * network->node_count + assignment->path->nodes[i + 1]] += request.load;
+            }
+        }
+    }
     free(loads);
+}
+
+void run_assignment(const network_t *network, assignment_t *assignments_ret, connection_request *requests, uint64_t request_count, const modulation_format *formats, uint64_t formats_dim, dynamic_char_array *link_slot_usages_ret, routing_assigner router, slot_assigner slotter, modulation_assigner modulator)
+{
+
+    router(network, requests, request_count, assignments_ret);
+    modulator(network, requests, request_count, assignments_ret, formats, formats_dim);
+    slotter(network, formats, assignments_ret, request_count, link_slot_usages_ret);
 }
 
 void generate_routing(const network_t *network, connection_request *requests, uint64_t requests_dim, const modulation_format *formats, uint64_t formats_dim, assignment_t *assignments_ret, dynamic_char_array *link_slot_usages_ret, routing_algorithms routing_algorithm, slot_assignment_algorithms slot_assigner_algorithm, modulation_format_assignment_algorithms format_assigner)
 {
-    routing_assigner router = routing_algorithm == FIXED_SHORTEST_PATH ? find_shortest_path_wrapper : find_least_maximally_loaded_path_modified;
-    slot_assigner slot_algorithm = slot_assigner_algorithm == FIRST_FIT_SLOT ? first_fit_slot_assignment_wrapper : least_used_slot_assignment;
-    modulation_assigner modulator = assign_modulation_format;
+    routing_assigner router = routing_algorithm == FIXED_SHORTEST_PATH ? run_SPF_routing : run_LML_routing;
+    slot_assigner slot_algorithm = slot_assigner_algorithm == FIRST_FIT_SLOT ? run_FFS_slotting : run_LUS_slotting;
+    modulation_assigner modulator = run_default_modulator;
     run_assignment(network, assignments_ret, requests, requests_dim, formats, formats_dim, link_slot_usages_ret, router, slot_algorithm, modulator);
 }
