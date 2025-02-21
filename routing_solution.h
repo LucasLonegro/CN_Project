@@ -17,7 +17,8 @@ typedef enum slot_status
 typedef enum routing_algorithms
 {
     FIXED_SHORTEST_PATH,
-    LEAST_USED_PATH
+    LEAST_USED_PATH,
+    LEAST_USED_PATH_JOINT
 } routing_algorithms;
 
 typedef enum slot_assignment_algorithms
@@ -40,7 +41,7 @@ typedef struct connection_request
 
 typedef struct assignment_t
 {
-    path_t *path;
+    const path_t *path;
     uint64_t load;
     uint64_t start_slot;
     uint64_t end_slot;

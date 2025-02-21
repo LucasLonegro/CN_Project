@@ -336,9 +336,121 @@ void run_LML_routing(const network_t *network, connection_request *requests, uin
     free(loads);
 }
 
+void highest_load(const network_t *network, uint64_t *loads, uint64_t *from_node_ret, uint64_t *to_node_ret)
+{
+    uint64_t max_load = 0;
+    for (uint64_t i = 0; i < network->node_count; i++)
+    {
+        for (uint64_t j = 0; j < network->node_count; j++)
+        {
+            if (loads[network->node_count * i + j] > max_load)
+            {
+                max_load = loads[network->node_count * i + j];
+                *from_node_ret = i;
+                *to_node_ret = j;
+            }
+        }
+    }
+}
+
+int contains_link(const network_t *network, uint64_t from, uint64_t to, const path_t *path)
+{
+    for (uint64_t i = 0; i < path->length; i++)
+    {
+        if (path->nodes[i] == from && path->nodes[i + 1] == to)
+            return 1;
+    }
+    return 0;
+}
+
+void change_path(const network_t *network, assignment_t *assignment, uint64_t *loads, uint64_t path_load, const path_t *new_path)
+{
+    for (uint64_t i = 0; i < assignment->path->length; i++)
+    {
+        loads[assignment->path->nodes[i] * network->node_count + assignment->path->nodes[i + 1]] -= path_load;
+    }
+
+    assignment->path = new_path;
+    // print_path(assignment->path, stdout);
+    for (uint64_t i = 0; i < assignment->path->length; i++)
+    {
+        loads[assignment->path->nodes[i] * network->node_count + assignment->path->nodes[i + 1]] += path_load;
+    }
+}
+
+uint64_t assignment_load(const assignment_t *assignment)
+{
+    if (assignment->is_split)
+    {
+        return assignment->load + assignment_load(assignment->split);
+    }
+    return assignment->load;
+}
+
+void run_LML_routing_modified(const network_t *network, connection_request *requests, uint64_t request_count, assignment_t *assignments_ret)
+{
+    uint64_t *loads = calloc(network->node_count * network->node_count, sizeof(uint64_t));
+    for (uint64_t request_index = 0; request_index < request_count; request_index++)
+    {
+        connection_request request = requests[request_index];
+
+        assignment_t *assignment = assignments_ret + request_index;
+        path_t *assigned_path = find_least_maximally_loaded_path_modified(network, request.from_node_id, request.to_node_id, loads); // Split loads over a single path
+        assignment->path = assigned_path;
+        if (assigned_path->length == -1)
+        {
+            printf("\n\nFAILED TO ASSIGN A PATH\n\n");
+        }
+        else
+        {
+            for (uint64_t i = 0; i < assignment->path->length; i++)
+            {
+                loads[assignment->path->nodes[i] * network->node_count + assignment->path->nodes[i + 1]] += request.load;
+            }
+        }
+    }
+
+    uint64_t could_reduce_load;
+    do
+    {
+        could_reduce_load = 0;
+        uint64_t from, to;
+        highest_load(network, loads, &from, &to);
+        uint64_t highest_load_value = loads[from * network->node_count + to];
+        __ssize_t best_candidate_index = -1;
+        const path_t *best_candidate_alternative_path = NULL;
+        __ssize_t max_reduction = 0;
+        for (uint64_t i = 0; i < request_count; i++)
+        {
+            if (contains_link(network, from, to, assignments_ret[i].path))
+            {
+                uint64_t candidate_load = requests[i].load;
+                const path_t *alternative_path = find_least_maximally_loaded_path_modified(network, assignments_ret[i].path->nodes[0], assignments_ret[i].path->nodes[assignments_ret[i].path->length], loads); // Split loads over a single path
+                                                                                                                                                                                                                //     print_path(alternative_path, stdout);
+                uint64_t alternative_path_maximal_load = most_loaded_link(network, alternative_path, loads);
+                __ssize_t reduction = +highest_load_value - alternative_path_maximal_load - candidate_load;
+                if (reduction > max_reduction)
+                {
+                    max_reduction = reduction;
+                    best_candidate_index = i;
+                    best_candidate_alternative_path = alternative_path;
+                }
+            }
+        }
+        if (best_candidate_index != -1)
+        {
+            uint64_t a, b;
+            change_path(network, assignments_ret + best_candidate_index, loads, requests[best_candidate_index].load, best_candidate_alternative_path);
+            highest_load(network, loads, &a, &b);
+            could_reduce_load = 1;
+        }
+    } while (could_reduce_load);
+
+    free(loads);
+}
+
 void run_assignment(const network_t *network, assignment_t *assignments_ret, connection_request *requests, uint64_t request_count, const modulation_format *formats, uint64_t formats_dim, dynamic_char_array *link_slot_usages_ret, routing_assigner router, slot_assigner slotter, modulation_assigner modulator)
 {
-
     router(network, requests, request_count, assignments_ret);
     modulator(network, requests, request_count, assignments_ret, formats, formats_dim);
     slotter(network, formats, assignments_ret, request_count, link_slot_usages_ret);
@@ -346,7 +458,20 @@ void run_assignment(const network_t *network, assignment_t *assignments_ret, con
 
 void generate_routing(const network_t *network, connection_request *requests, uint64_t requests_dim, const modulation_format *formats, uint64_t formats_dim, assignment_t *assignments_ret, dynamic_char_array *link_slot_usages_ret, routing_algorithms routing_algorithm, slot_assignment_algorithms slot_assigner_algorithm, modulation_format_assignment_algorithms format_assigner)
 {
-    routing_assigner router = routing_algorithm == FIXED_SHORTEST_PATH ? run_SPF_routing : run_LML_routing;
+    routing_assigner router = routing_algorithm == FIXED_SHORTEST_PATH ? run_SPF_routing : run_LML_routing_modified;
+    switch (routing_algorithm)
+    {
+    case LEAST_USED_PATH:
+        router = run_LML_routing;
+        break;
+    case LEAST_USED_PATH_JOINT:
+        router = run_LML_routing_modified;
+        break;
+    case FIXED_SHORTEST_PATH:
+    default:
+        router = run_SPF_routing;
+        break;
+    }
     slot_assigner slot_algorithm = slot_assigner_algorithm == FIRST_FIT_SLOT ? run_FFS_slotting : run_LUS_slotting;
     modulation_assigner modulator = run_default_modulator;
     run_assignment(network, assignments_ret, requests, requests_dim, formats, formats_dim, link_slot_usages_ret, router, slot_algorithm, modulator);

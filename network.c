@@ -1,7 +1,6 @@
 #include "network.h"
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 
 #define IS_BIT_SET(x, i) (((x)[(i) >> 3] & (1 << ((i) & 7))) != 0)
 #define SET_BIT(x, i) (x)[(i) >> 3] |= (1 << ((i) & 7))
@@ -11,7 +10,7 @@
 #define SET_LINK_WEIGHT(n, i1, i2, w) ((n)->adjacency_matrix[(i1) * (n)->node_count + (i2)] = (w))
 
 int noop_validator(const network_t *network, uint64_t from, uint64_t to, const void *data);
-void print_path(path_t *p, FILE *file)
+void print_path(const path_t *p, FILE *file)
 {
     fprintf(file, "\t");
     fprintf(file, "Length: %ld\t", p->length);

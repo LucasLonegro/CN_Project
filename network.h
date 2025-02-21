@@ -1,6 +1,8 @@
 #ifndef NTWK_H
 #define NTWK_H
 #include <stdint.h>
+#include <stdio.h>
+
 
 typedef struct path_t
 {
@@ -40,5 +42,7 @@ path_t *const *k_shortest_paths(const network_t *network, uint64_t from, uint64_
 path_t **modified_weighted_distances(const network_t *network, uint64_t from, link_validator validator, void *data);
 
 void free_distances(const network_t *network, path_t **distances);
+
+void print_path(const path_t *p, FILE *file);
 
 #endif
