@@ -5,7 +5,7 @@
 
 #define K 5
 
-typedef __ssize_t (*assigner)(const network_t *network, assignment_t *current_assignments, connection_request request, uint64_t request_index, uint64_t request_count, const modulation_format *formats, uint64_t formats_dim, void **data, dynamic_char_array *link_slot_usages_ret);
+typedef void (*assigner)(const network_t *network, assignment_t *current_assignments, connection_request *request, uint64_t request_count, const modulation_format *formats, uint64_t formats_dim, dynamic_char_array *link_slot_usages_ret);
 
 path_t *find_shortest_path(const network_t *network, uint64_t from_node_id, uint64_t to_node_id)
 {
@@ -198,132 +198,106 @@ typedef struct usages_and_loads
     uint64_t *usages;
 } usages_and_loads;
 
-__ssize_t least_used_path(const network_t *network, assignment_t *current_assignments, connection_request request, uint64_t request_index, uint64_t request_count, const modulation_format *formats, uint64_t formats_dim, void **data, dynamic_char_array *link_slot_usages_ret)
+void least_used_path(const network_t *network, assignment_t *current_assignments, connection_request *requests, uint64_t request_count, const modulation_format *formats, uint64_t formats_dim, dynamic_char_array *link_slot_usages_ret)
 {
-    usages_and_loads *_data = (usages_and_loads *)(*data);
-    if (request_index >= request_count)
+    usages_and_loads *_data = calloc(1, sizeof(usages_and_loads));
+    _data->usages = calloc(MAX_SPECTRAL_SLOTS, sizeof(uint64_t));
+    _data->loads = calloc(network->node_count * network->node_count, sizeof(uint64_t));
+    for (uint64_t request_index = 0; request_index < request_count; request_index++)
     {
-        if (*data != NULL)
+        connection_request request = requests[request_index];
+
+        __ssize_t leftover_load = request.load;
+        assignment_t *assignment = current_assignments + request_index;
+        path_t *assigned_path = find_least_maximally_loaded_path_modified(network, request.from_node_id, request.to_node_id, _data->loads); // Split loads over a single path
+        do
         {
-            free(_data->usages);
-            free(_data->loads);
-            free(*data);
-        }
-        return -1;
+            assignment->load = leftover_load;
+            assignment->path = assigned_path;
+            assignment->is_split = 0;
+            for (uint64_t i = 0; i < assignment->path->length; i++)
+            {
+                _data->loads[assignment->path->nodes[i] * network->node_count + assignment->path->nodes[i + 1]] += assignment->load;
+            }
+
+            if (assigned_path->length == -1)
+            {
+                printf("\n\nFAILED TO ASSIGN A PATH\n\n");
+            }
+
+            leftover_load = assign_modulation_format(formats, formats_dim, assignment);
+
+            if (leftover_load == -1)
+            {
+                printf("\n\nFAILED TO ASSIGN A PATH\n\n");
+            }
+
+            // first_fit_slot_assignment(network, formats, assignment, link_slot_usages_ret);
+            least_used_slot_assignment(network, formats, assignment, link_slot_usages_ret, _data->usages);
+
+            if (leftover_load)
+            {
+                assignment_t *split_assignment = calloc(1, sizeof(assignment_t));
+                assignment->split = split_assignment;
+                assignment->is_split = 1;
+                split_assignment->is_split = 0;
+
+                assignment = split_assignment;
+            }
+        } while (leftover_load);
     }
-    if (*data == NULL)
-    {
-        *data = calloc(1, sizeof(usages_and_loads));
-        _data = (usages_and_loads *)*data;
-        _data->usages = calloc(MAX_SPECTRAL_SLOTS, sizeof(uint64_t));
-        _data->loads = calloc(network->node_count * network->node_count, sizeof(uint64_t));
-    }
-
-    __ssize_t leftover_load = request.load;
-    assignment_t *assignment = current_assignments + request_index;
-    path_t *assigned_path = find_least_maximally_loaded_path_modified(network, request.from_node_id, request.to_node_id, _data->loads); // Split loads over a single path
-    do
-    {
-        assignment->load = leftover_load;
-        assignment->path = assigned_path;
-        assignment->is_split = 0;
-        for (uint64_t i = 0; i < assignment->path->length; i++)
-        {
-            _data->loads[assignment->path->nodes[i] * network->node_count + assignment->path->nodes[i + 1]] += assignment->load;
-        }
-
-        if (assigned_path->length == -1)
-        {
-            printf("\n\nFAILED TO ASSIGN A PATH\n\n");
-        }
-
-        leftover_load = assign_modulation_format(formats, formats_dim, assignment);
-
-        if (leftover_load == -1)
-        {
-            printf("\n\nFAILED TO ASSIGN A PATH\n\n");
-        }
-
-        // first_fit_slot_assignment(network, formats, assignment, link_slot_usages_ret);
-        least_used_slot_assignment(network, formats, assignment, link_slot_usages_ret, _data->usages);
-
-        if (leftover_load)
-        {
-            assignment_t *split_assignment = calloc(1, sizeof(assignment_t));
-            assignment->split = split_assignment;
-            assignment->is_split = 1;
-            split_assignment->is_split = 0;
-
-            assignment = split_assignment;
-        }
-    } while (leftover_load);
-
-    return request_index + 1;
+    free(_data->usages);
+    free(_data->loads);
+    free(_data);
 }
 
-__ssize_t fixed_shortest_path(const network_t *network, assignment_t *current_assignments, connection_request request, uint64_t request_index, uint64_t request_count, const modulation_format *formats, uint64_t formats_dim, void **data, dynamic_char_array *link_slot_usages_ret)
+void fixed_shortest_path(const network_t *network, assignment_t *current_assignments, connection_request *requests, uint64_t request_count, const modulation_format *formats, uint64_t formats_dim, dynamic_char_array *link_slot_usages_ret)
 {
-
-    if (request_index >= request_count)
+    uint64_t *_data = calloc(MAX_SPECTRAL_SLOTS, sizeof(uint64_t));
+    for (uint64_t request_index = 0; request_index < request_count; request_index++)
     {
-        if (*data != NULL)
-            free(*data);
-        return -1;
+        connection_request request = requests[request_index];
+        __ssize_t leftover_load = request.load;
+        assignment_t *assignment = current_assignments + request_index;
+        path_t *assigned_path = find_shortest_path(network, request.from_node_id, request.to_node_id); // Split loads over a single path
+        do
+        {
+            assignment->load = leftover_load;
+            assignment->path = assigned_path;
+            assignment->is_split = 0;
+
+            if (assigned_path->length == -1)
+            {
+                printf("\n\nFAILED TO ASSIGN A PATH\n\n");
+            }
+
+            leftover_load = assign_modulation_format(formats, formats_dim, assignment);
+
+            if (leftover_load == -1)
+            {
+                printf("\n\nFAILED TO ASSIGN A PATH\n\n");
+            }
+
+            // first_fit_slot_assignment(network, formats, assignment, link_slot_usages_ret);
+            least_used_slot_assignment(network, formats, assignment, link_slot_usages_ret, _data);
+
+            if (leftover_load)
+            {
+                assignment_t *split_assignment = calloc(1, sizeof(assignment_t));
+                assignment->split = split_assignment;
+                assignment->is_split = 1;
+                split_assignment->is_split = 0;
+
+                assignment = split_assignment;
+            }
+        } while (leftover_load);
     }
-    if (*data == NULL)
-    {
-        *data = calloc(MAX_SPECTRAL_SLOTS, sizeof(uint64_t));
-    }
-
-    uint64_t *_data = (uint64_t *)(*data);
-
-    __ssize_t leftover_load = request.load;
-    assignment_t *assignment = current_assignments + request_index;
-    path_t *assigned_path = find_shortest_path(network, request.from_node_id, request.to_node_id); // Split loads over a single path
-    do
-    {
-        assignment->load = leftover_load;
-        assignment->path = assigned_path;
-        assignment->is_split = 0;
-
-        if (assigned_path->length == -1)
-        {
-            printf("\n\nFAILED TO ASSIGN A PATH\n\n");
-        }
-
-        leftover_load = assign_modulation_format(formats, formats_dim, assignment);
-
-        if (leftover_load == -1)
-        {
-            printf("\n\nFAILED TO ASSIGN A PATH\n\n");
-        }
-
-        // first_fit_slot_assignment(network, formats, assignment, link_slot_usages_ret);
-        least_used_slot_assignment(network, formats, assignment, link_slot_usages_ret, _data);
-
-        if (leftover_load)
-        {
-            assignment_t *split_assignment = calloc(1, sizeof(assignment_t));
-            assignment->split = split_assignment;
-            assignment->is_split = 1;
-            split_assignment->is_split = 0;
-
-            assignment = split_assignment;
-        }
-    } while (leftover_load);
-
-    return request_index + 1;
+    free(_data);
 }
 
 void run_routing_algorithm(const network_t *network, connection_request *requests, uint64_t requests_dim, const modulation_format *formats, uint64_t formats_dim, assigner algorithm, assignment_t *assignments_ret, dynamic_char_array *link_slot_usages_ret)
 {
-    void *data = NULL;
-    uint64_t index = 0;
-    while (index != -1)
-    {
-        index = algorithm(network, assignments_ret, requests[index], index, requests_dim, formats, formats_dim, &data, link_slot_usages_ret);
-    }
-    return;
+    algorithm(network, assignments_ret, requests, requests_dim, formats, formats_dim, link_slot_usages_ret);
 }
 
 void generate_routing(const network_t *network, connection_request *requests, uint64_t requests_dim, const modulation_format *formats, uint64_t formats_dim, assignment_t *assignments_ret, dynamic_char_array *link_slot_usages_ret, routing_algorithms algorithm)
