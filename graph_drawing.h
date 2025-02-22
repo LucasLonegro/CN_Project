@@ -3,8 +3,11 @@
 #include <stdio.h>
 #include "network.h"
 
-#define SPRING_CONSTANT 0.0001
-#define MAX_ITERATIONS 8001
+#define GRAVITATIONAL_CONSTANT 1.1
+#define REPULSIVE_CONSTANT 100.0
+#define DESIRED_DISTANCE 150.0
+#define MASS 3.0
+#define MAX_ITERATIONS 1000000
 
 typedef struct coordinate
 {
