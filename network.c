@@ -132,8 +132,38 @@ void sort_by_distance(path_t **array, uint64_t array_dim, int ascending)
     }
 }
 
+path_t **modified_yens_algorithm(const network_t *network, uint64_t from, uint64_t to, uint64_t n, link_validator validator, const void *validator_data);
 // abandon all hope ye who enter here
 path_t **yens_algorithm(const network_t *network, uint64_t from, uint64_t to, uint64_t n)
+{
+    return modified_yens_algorithm(network, from, to, n, noop_validator, NULL);
+}
+
+typedef struct link_validator_list_entry
+{
+    const void *data;
+    link_validator validator;
+} link_validator_list_entry;
+
+typedef struct link_validator_list
+{
+    link_validator_list_entry *entries;
+    uint64_t len;
+} link_validator_list;
+
+int validator_joiner(const network_t *network, uint64_t from, uint64_t to, const void *data)
+{
+    link_validator_list *_data = (link_validator_list *)data;
+    for (uint64_t i = 0; i < _data->len; i++)
+    {
+        if (_data->entries[i].validator != NULL && !(_data->entries[i].validator(network, from, to, _data->entries[i].data)))
+            return 0;
+    }
+    return 1;
+}
+
+// abandon all hope ye who enter here
+path_t **modified_yens_algorithm(const network_t *network, uint64_t from, uint64_t to, uint64_t n, link_validator validator, const void *validator_data)
 {
     path_t **A = calloc(n, sizeof(path_t *));
     uint64_t A_size = 0;
@@ -146,7 +176,13 @@ path_t **yens_algorithm(const network_t *network, uint64_t from, uint64_t to, ui
     char *nodes_are_removed = calloc((network->node_count >> 3) + 1, sizeof(char));
     removed_elements data = {.removed_links = edges_are_removed, .removed_nodes = nodes_are_removed};
 
-    path_t **aux = modified_weighted_distances(network, from, noop_validator, NULL);
+    link_validator_list validator_join;
+
+    link_validator_list_entry entries[] = {{.validator = is_not_using_removed_elements_and_does_not_revisit_nodes, .data = (void *)&data}, {.validator = validator, .data = validator_data}};
+    validator_join.len = 2;
+    validator_join.entries = entries;
+
+    path_t **aux = modified_weighted_distances(network, from, validator, validator_data);
     for (uint64_t i = 0; i < network->node_count; i++)
         if (i != to)
         {
@@ -154,6 +190,14 @@ path_t **yens_algorithm(const network_t *network, uint64_t from, uint64_t to, ui
             free(aux[i]);
         }
     A[0] = aux[to];
+    free(aux);
+    if (A[0]->distance == -1)
+    {
+        free(B);
+        free(nodes_are_removed);
+        free(edges_are_removed);
+        return A;
+    }
     A_size = 1;
 
     for (uint64_t k = 0; k < n - 1; k++)
@@ -181,7 +225,7 @@ path_t **yens_algorithm(const network_t *network, uint64_t from, uint64_t to, ui
             }
             path_t *subpath_to_spur_node = subpath(network, A[k], i);
             data.path = subpath_to_spur_node;
-            path_t **spur_paths_aux = modified_weighted_distances(network, spur_node, is_not_using_removed_elements_and_does_not_revisit_nodes, (void *)&data);
+            path_t **spur_paths_aux = modified_weighted_distances(network, spur_node, validator_joiner, (void *)&validator_join);
             free(subpath_to_spur_node);
             for (uint64_t i = 0; i < network->node_count; i++)
                 if (i != to)
@@ -236,10 +280,16 @@ path_t **yens_algorithm(const network_t *network, uint64_t from, uint64_t to, ui
         }
     }
     free(B);
-    free(aux);
     free(nodes_are_removed);
     free(edges_are_removed);
     return A;
+}
+
+path_t **modified_k_shortest_paths(const network_t *network, uint64_t from, uint64_t to, uint64_t k, link_validator validator, const void *data)
+{
+    if (validator == NULL)
+        validator = noop_validator;
+    return modified_yens_algorithm(network, from, to, k, validator, data);
 }
 
 // I shall dub you the memory fragmentator
@@ -371,7 +421,7 @@ int noop_validator(const network_t *network, uint64_t from, uint64_t to, const v
     return 1;
 }
 
-path_t **modified_dijkstra(const network_t *network, uint64_t from, read_link_weight read_function, link_validator validator, void *data);
+path_t **modified_dijkstra(const network_t *network, uint64_t from, read_link_weight read_function, link_validator validator, const void *data);
 path_t **dijkstra(const network_t *network, uint64_t from, read_link_weight read_function)
 {
     return modified_dijkstra(network, from, read_function, noop_validator, NULL);
@@ -395,7 +445,7 @@ path_t *const *unweighted_distances(const network_t *network, uint64_t from)
     return distances;
 }
 
-path_t **modified_weighted_distances(const network_t *network, uint64_t from, link_validator validator, void *data)
+path_t **modified_weighted_distances(const network_t *network, uint64_t from, link_validator validator, const void *data)
 {
     return modified_dijkstra(network, from, get_link_weight, validator, data);
 }
@@ -409,7 +459,7 @@ void free_distances(const network_t *network, path_t **distances)
     free(distances);
 }
 
-path_t **modified_dijkstra(const network_t *network, uint64_t from, read_link_weight read_function, link_validator validator, void *data)
+path_t **modified_dijkstra(const network_t *network, uint64_t from, read_link_weight read_function, link_validator validator, const void *data)
 {
     if (from > network->node_count)
         return NULL;
