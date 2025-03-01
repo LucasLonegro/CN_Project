@@ -6,12 +6,15 @@
 
 // Increase to give greater weight to number of links in path vs load when ranking paths in least_used_path algorithm
 #define LENGTH_LOAD_PONDERATION 1000.0
+#define OVERLAP_SHARED_PROTECTION_SLOTS 1
 
 typedef enum slot_status
 {
     UNUSED = 0,
     USED,
-    GUARD_BAND
+    PROTECTION_USED,
+    GUARD_BAND,
+    PROTECTION_GUARD_BAND
 } slot_status;
 
 typedef enum routing_algorithms
@@ -24,12 +27,21 @@ typedef enum routing_algorithms
 typedef enum slot_assignment_algorithms
 {
     LEAST_USED_SLOT,
-    FIRST_FIT_SLOT
+    FIRST_FIT_SLOT,
+    NON_CONTINUOUS = 1 << 3,
+    NON_CONTIGUOUS = 1 << 4
 } slot_assignment_algorithms;
+
+typedef enum protection_type
+{
+    NO_PROTECTION,
+    DEDICATED_PROTECTION,
+    SHARED_PROTECTION
+} protection_type;
 
 typedef enum modulation_format_assignment_algorithms
 {
-    DEFAULT,
+    DEFAULT_MODULATION,
 } modulation_format_assignment_algorithms;
 
 typedef struct connection_request
@@ -50,6 +62,23 @@ typedef struct assignment_t
     struct assignment_t *split;
 } assignment_t;
 
-void generate_routing(const network_t *network, connection_request *requests, uint64_t requests_dim, const modulation_format *formats, uint64_t formats_dim, assignment_t *assignments_ret, dynamic_char_array *link_slot_usages_ret, routing_algorithms routing_algorithm, slot_assignment_algorithms slot_assigner_algorithm, modulation_format_assignment_algorithms format_assigner);
+/**
+ * @brief generates a routing solution given a set of RMSA algorithms
+ *
+ * @param network
+ * @param requests
+ * @param requests_dim
+ * @param formats
+ * @param formats_dim
+ * @param assignments_ret
+ * @param protections_ret
+ * @param protection
+ * @param link_slot_usages_ret
+ * @param routing_algorithm
+ * @param slot_assigner_algorithm
+ * @param format_assigner
+ * @return path_t** a NULL-terminated array of paths that must be freed, as well as the array. Can be NULL if empty.
+ */
+path_t **generate_routing(const network_t *network, connection_request *requests, uint64_t requests_dim, const modulation_format *formats, uint64_t formats_dim, assignment_t *assignments_ret, assignment_t *protections_ret, protection_type protection, dynamic_char_array *link_slot_usages_ret, routing_algorithms routing_algorithm, slot_assignment_algorithms slot_assigner_algorithm, modulation_format_assignment_algorithms format_assigner);
 
 #endif

@@ -21,10 +21,13 @@ void free_assignment(assignment_t *assignment)
 
 void print_assignment(const assignment_t assignment, FILE *file)
 {
+    if (assignment.path == NULL || assignment.path->length == -1)
+    {
+        fprintf(file, COLOR_BOLD_SLOW_BLINKING_RED "Unassigned Connection" COLOR_OFF);
+        return;
+    }
     for (uint64_t j = 0; j <= assignment.path->length; j++)
     {
-        if (assignment.path->length == -1)
-            break;
         fprintf(file, "%ld", assignment.path->nodes[j] + 1);
         if (j != assignment.path->length)
             fprintf(file, "->");
@@ -142,10 +145,11 @@ void run_solution(uint64_t topology_node_count, uint64_t links[][3], uint64_t li
     bubble_sort_connection_requests(requests, requests_count, ascending);
 
     assignment_t *assignments = calloc(requests_count, sizeof(assignment_t));
+    assignment_t *protections = calloc(requests_count, sizeof(assignment_t));
 
     dynamic_char_array *used_frequency_slots = calloc(topology_node_count * topology_node_count, sizeof(dynamic_char_array));
 
-    generate_routing(network, requests, requests_count, formats, MODULATION_FORMATS_DIM, assignments, used_frequency_slots, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT);
+    path_t **to_free = generate_routing(network, requests, requests_count, formats, MODULATION_FORMATS_DIM, assignments, protections, SHARED_PROTECTION, used_frequency_slots, LEAST_USED_PATH_JOINT, FIRST_FIT_SLOT, DEFAULT_MODULATION);
 
     uint64_t *total_link_loads = calloc(topology_node_count * topology_node_count, sizeof(uint64_t));
     for (uint64_t i = 0; i < requests_count; i++)
@@ -163,6 +167,13 @@ void run_solution(uint64_t topology_node_count, uint64_t links[][3], uint64_t li
     for (uint64_t i = 0; i < requests_count; i++)
     {
         print_assignment(assignments[i], file);
+        fprintf(file, "\n");
+    }
+
+    fprintf(file, COLOR_BOLD_BLUE "\nProtection RMSAs\n" COLOR_OFF);
+    for (uint64_t i = 0; i < requests_count; i++)
+    {
+        print_assignment(protections[i], file);
         fprintf(file, "\n");
     }
 
@@ -271,10 +282,21 @@ void run_solution(uint64_t topology_node_count, uint64_t links[][3], uint64_t li
         {
             free_assignment(assignments[i].split);
         }
+        if (protections[i].is_split)
+        {
+            free_assignment(protections[i].split);
+        }
     }
     free(requests);
     free(total_link_loads);
     free(assignments);
+    free(protections);
+    for (uint64_t i = 0; to_free != NULL && to_free[i] != NULL; i++)
+    {
+        free(to_free[i]->nodes);
+        free(to_free[i]);
+    }
+    free(to_free);
     for (uint64_t i = 0; i < topology_node_count * topology_node_count; i++)
     {
         if (used_frequency_slots[i].size > 0)
