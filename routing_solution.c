@@ -24,9 +24,11 @@ void accumulate_slots(const network_t *network, const path_t *path, dynamic_char
     {
         for (uint64_t j = 0; j < source_arrays[path->nodes[i] * network->node_count + path->nodes[i + 1]].size; j++)
         {
-            if (get_element(source_arrays + path->nodes[i] * network->node_count + path->nodes[i + 1], j) != UNUSED)
+            char slot_state = get_element(source_arrays + path->nodes[i] * network->node_count + path->nodes[i + 1], j);
+            char prev_slot_state = get_element(array, j);
+            if (slot_state != UNUSED && prev_slot_state != USED && (slot_state == USED || prev_slot_state != GUARD_BAND))
             {
-                set_element(array, j, USED);
+                set_element(array, j, slot_state);
             }
         }
     }
@@ -61,7 +63,8 @@ __ssize_t first_fit_slot_assignment(const network_t *network, const modulation_f
     uint64_t consecutive_slots = 0;
     for (uint64_t i = 0; i < MAX_SPECTRAL_SLOTS; i++)
     {
-        if (get_element(available_slots, i) == UNUSED)
+        char slot_state = get_element(available_slots, i);
+        if (slot_state == UNUSED || (OVERLAP_SHARED_PROTECTION_SLOTS && protection == SHARED_PROTECTION && slot_state == PROTECTION_USED))
         {
             consecutive_slots++;
             if (consecutive_slots >= slot_requirement)
@@ -100,7 +103,8 @@ __ssize_t least_used_slot_assignment(const network_t *network, const modulation_
     uint64_t consecutive_slots = 0;
     for (uint64_t i = 0; i < MAX_SPECTRAL_SLOTS; i++)
     {
-        if (get_element(available_slots, i) == UNUSED)
+        char slot_state = get_element(available_slots, i);
+        if (slot_state == UNUSED || (OVERLAP_SHARED_PROTECTION_SLOTS && protection == SHARED_PROTECTION && slot_state == PROTECTION_USED))
         {
             consecutive_slots++;
             uint64_t usage;
@@ -278,7 +282,7 @@ void run_default_modulator(const network_t *network, connection_request *request
 
 void run_LUS_slotting_internal(const network_t *network, const modulation_format *formats, assignment_t *assignments_ret, assignment_t *protections, protection_type protection, uint64_t request_count, dynamic_char_array *link_slot_usages_ret, uint64_t *usages)
 {
-    if (protection == DEDICATED_PROTECTION)
+    if (protection != NO_PROTECTION)
         assignments_ret = protections;
     for (uint64_t request_index = 0; request_index < request_count; request_index++)
     {
@@ -319,7 +323,7 @@ void run_LUS_slotting(const network_t *network, const modulation_format *formats
 
 void run_FFS_slotting_internal(const network_t *network, const modulation_format *formats, assignment_t *assignments_ret, assignment_t *protections, protection_type protection, uint64_t request_count, dynamic_char_array *link_slot_usages_ret)
 {
-    if (protection == DEDICATED_PROTECTION)
+    if (protection != NO_PROTECTION)
         assignments_ret = protections;
     for (uint64_t request_index = 0; request_index < request_count; request_index++)
     {
@@ -459,10 +463,62 @@ int is_node_disjoint(const network_t *network, uint64_t from, uint64_t to, const
     return 1;
 }
 
+dynamic_word_array *build_node_users(const network_t *network, const assignment_t *assignments, uint64_t assignments_count)
+{
+    dynamic_word_array *node_users = calloc(network->node_count, sizeof(dynamic_word_array));
+    for (uint64_t i = 0; i < assignments_count; i++)
+    {
+        if (assignments[i].path->distance != -1)
+        {
+            for (uint64_t j = 1; j < assignments[i].path->length; j++)
+            {
+                set_value(node_users + assignments[i].path->nodes[j], node_users[assignments[i].path->nodes[j]].size, i);
+            }
+        }
+    }
+    return node_users;
+}
+
+int add_elem(uint64_t *arr, uint64_t dim, uint64_t elem)
+{
+    for (uint64_t i = 0; i < dim; i++)
+    {
+        if (arr[i] == elem)
+            return 0;
+    }
+    arr[dim] = elem;
+    return 0;
+}
+
+typedef struct conflict_data
+{
+    assignment_t *protection_paths;
+    uint64_t *conflicts;
+    uint64_t conflicts_dim;
+} conflict_data;
+
+int do_not_conflict(const network_t *network, uint64_t from, uint64_t to, const void *data)
+{
+    conflict_data *_data = (conflict_data *)data;
+    for (uint64_t i = 0; i < _data->conflicts_dim; i++)
+    {
+        if (!is_node_disjoint(network, from, to, (void *)_data->protection_paths[_data->conflicts[i]].path))
+            return 0;
+    }
+    return 1;
+}
+
 path_t **run_LML_routing_modified_internal(const network_t *network, connection_request *requests, uint64_t request_count, assignment_t *assignments_ret, assignment_t *protections, protection_type protection, uint64_t *loads)
 {
     assignment_t *to_assign = protection == NO_PROTECTION ? assignments_ret : protections;
     path_t **to_ret = protection == NO_PROTECTION ? NULL : calloc(request_count + 1, sizeof(path_t *));
+    dynamic_word_array *node_users;
+    uint64_t *conflicts, conflicts_count = 0;
+    if (protection == SHARED_PROTECTION)
+    {
+        node_users = build_node_users(network, assignments_ret, request_count);
+        conflicts = calloc(request_count, sizeof(uint64_t));
+    }
     uint64_t to_ret_index = 0;
     for (uint64_t request_index = 0; request_index < request_count; request_index++)
     {
@@ -470,14 +526,35 @@ path_t **run_LML_routing_modified_internal(const network_t *network, connection_
 
         assignment_t *assignment = to_assign + request_index;
         path_t *assigned_path;
+        conflict_data data = {.conflicts = conflicts, .protection_paths = protections};
         if (protection == DEDICATED_PROTECTION)
         {
-            assigned_path = find_least_maximally_loaded_path_modified_validators(network, request.from_node_id, request.to_node_id, loads, is_node_disjoint, assignments_ret[request_index].path); // Split loads over a single path
+            assigned_path = find_least_maximally_loaded_path_modified_validators(network, request.from_node_id, request.to_node_id, loads, is_node_disjoint, (void *)assignments_ret[request_index].path);
+            to_ret[to_ret_index++] = assigned_path;
+        }
+        else if (protection == SHARED_PROTECTION)
+        {
+            conflicts_count = 0;
+            for (uint64_t i = 0; i <= assignments_ret[request_index].path->length; i++)
+            {
+                for (uint64_t j = 0; j < node_users[assignments_ret[request_index].path->nodes[i]].size; j++)
+                {
+                    uint64_t conflict_index = get_value(node_users, assignments_ret[request_index].path->nodes[i]);
+                    if (conflict_index > request_index)
+                        conflicts_count += add_elem(conflicts, conflicts_count, conflict_index);
+                }
+            }
+            link_validator_list validator_join;
+            data.conflicts_dim = conflicts_count;
+            link_validator_list_entry entries[] = {{.validator = is_node_disjoint, .data = (void *)assignments_ret[request_index].path}, {.validator = do_not_conflict, .data = (void *)&data}};
+            validator_join.len = 2;
+            validator_join.entries = entries;
+            assigned_path = find_least_maximally_loaded_path_modified_validators(network, request.from_node_id, request.to_node_id, loads, validator_joiner, (void *)&validator_join);
             to_ret[to_ret_index++] = assigned_path;
         }
         else
         {
-            assigned_path = find_least_maximally_loaded_path_modified(network, request.from_node_id, request.to_node_id, loads); // Split loads over a single path
+            assigned_path = find_least_maximally_loaded_path_modified(network, request.from_node_id, request.to_node_id, loads);
         }
         assignment->path = assigned_path;
         if (assigned_path->length == -1)
@@ -491,6 +568,17 @@ path_t **run_LML_routing_modified_internal(const network_t *network, connection_
                 loads[assignment->path->nodes[i] * network->node_count + assignment->path->nodes[i + 1]] += request.load;
             }
         }
+    }
+
+    if (protection == SHARED_PROTECTION)
+    {
+        for (uint64_t i = 0; i < network->node_count; i++)
+        {
+            if (node_users[i].size > 0)
+                free(node_users[i].elements);
+        }
+        free(node_users);
+        free(conflicts);
     }
 
     if (protection == NO_PROTECTION)

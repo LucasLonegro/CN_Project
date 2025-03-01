@@ -139,18 +139,6 @@ path_t **yens_algorithm(const network_t *network, uint64_t from, uint64_t to, ui
     return modified_yens_algorithm(network, from, to, n, noop_validator, NULL);
 }
 
-typedef struct link_validator_list_entry
-{
-    const void *data;
-    link_validator validator;
-} link_validator_list_entry;
-
-typedef struct link_validator_list
-{
-    link_validator_list_entry *entries;
-    uint64_t len;
-} link_validator_list;
-
 int validator_joiner(const network_t *network, uint64_t from, uint64_t to, const void *data)
 {
     link_validator_list *_data = (link_validator_list *)data;

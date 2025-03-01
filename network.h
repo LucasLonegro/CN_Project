@@ -26,7 +26,19 @@ typedef struct network_t
 } network_t;
 
 typedef int (*link_validator)(const network_t *network, uint64_t from, uint64_t to, const void *data);
+typedef struct link_validator_list_entry
+{
+    const void *data;
+    link_validator validator;
+} link_validator_list_entry;
+
+typedef struct link_validator_list
+{
+    link_validator_list_entry *entries;
+    uint64_t len;
+} link_validator_list;
 int noop_validator(const network_t *network, uint64_t from, uint64_t to, const void *data);
+int validator_joiner(const network_t *network, uint64_t from, uint64_t to, const void *data);
 
 network_t *new_network(uint64_t node_count);
 void free_network(network_t *network);
