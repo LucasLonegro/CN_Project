@@ -2,9 +2,13 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <math.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include "network.h"
 #include "problem.h"
 #include "routing_solution.h"
+#include "graph_drawing.h"
+
 
 #define COLOR_BOLD "\e[1m"
 #define COLOR_BOLD_SLOW_BLINKING "\e[1;5m"
@@ -116,6 +120,19 @@ void bubble_sort_connection_requests(connection_request *requests, uint64_t requ
             }
         }
     }
+}
+
+typedef struct read_link_weight_data_t
+{
+    char buffer[256];
+    network_t *network;
+} read_link_weight_data_t;
+
+char *read_link_weight(void *data, uint64_t from, uint64_t to)
+{
+    read_link_weight_data_t *_data = (read_link_weight_data_t *)data;
+    sprintf(_data->buffer, "%ld", get_link_weight(_data->network, from, to));
+    return _data->buffer;
 }
 
 void run_solution(uint64_t topology_node_count, uint64_t links[][3], uint64_t links_count, const uint64_t *connection_requests, int ascending, FILE *file)
@@ -276,6 +293,20 @@ void run_solution(uint64_t topology_node_count, uint64_t links[][3], uint64_t li
 
     fprintf(file, "\nEND\n");
 
+    mkdir("./reports", S_IRWXU|S_IRWXG|S_IROTH);
+    FILE *f = fopen("reports/out.tex", "w+");
+    print_prologue(f, "italian");
+    print_section(f, "Topology");
+    coordinate c[] = {{.x = 2.0, .y = 4.0}, {.x = 3.5, .y = 4.0}, {.x = 0.5, .y = 4.0}, {.x = 5.0, .y = 4.0}, {.x = 0.0, .y = 2.0}, {.x = 0.5, .y = 0.0}, {.x = 2.0, .y = 2.0}, {.x = 4.0, .y = 2.0}, {.x = 2.8, .y = 0.0}, {.x = 4.0, .y = 0.0}};
+    read_link_weight_data_t data = {.network = network};
+    print_graph(network, read_link_weight, &data, c, NULL, 0, 1.5, 1.0, f);
+    coordinate points[1][4] = {{{.x = 0.1, .y = 10}, {.x = 0.2, .y = 20}, {.x = 0.3, .y = 22}, {.x = 0.4, .y = 11}}};
+    char *legends[] = {"Range"};
+    bar_plot p = {.data_points_count = 4, .samples_count = 1, .legends = legends, .y_label = "Frequency", .data_points = (coordinate *)points};
+    print_section(f, "Entropy");
+    print_plot(p, f);
+    print_epilogue(f);
+
     for (uint64_t i = 0; i < requests_count; i++)
     {
         if (assignments[i].is_split)
@@ -308,26 +339,26 @@ void run_solution(uint64_t topology_node_count, uint64_t links[][3], uint64_t li
 
 int main(void)
 {
-    run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_1, 0, stdout);
-    run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_1, 1, stdout);
-    run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_2, 0, stdout);
-    run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_2, 1, stdout);
-    run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_3, 0, stdout);
-    run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_3, 1, stdout);
-    run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_4, 0, stdout);
-    run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_4, 1, stdout);
-    run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_5, 0, stdout);
-    run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_5, 1, stdout);
-
-    run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_1, 0, stdout);
-    run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_1, 1, stdout);
-    run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_2, 0, stdout);
-    run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_2, 1, stdout);
-    run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_3, 0, stdout);
-    run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_3, 1, stdout);
-    run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_4, 0, stdout);
-    run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_4, 1, stdout);
-    run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_5, 0, stdout);
+    // run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_1, 0, stdout);
+    // run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_1, 1, stdout);
+    // run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_2, 0, stdout);
+    // run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_2, 1, stdout);
+    // run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_3, 0, stdout);
+    // run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_3, 1, stdout);
+    // run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_4, 0, stdout);
+    // run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_4, 1, stdout);
+    // run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_5, 0, stdout);
+    // run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_5, 1, stdout);
+    //
+    // run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_1, 0, stdout);
+    // run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_1, 1, stdout);
+    // run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_2, 0, stdout);
+    // run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_2, 1, stdout);
+    // run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_3, 0, stdout);
+    // run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_3, 1, stdout);
+    // run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_4, 0, stdout);
+    // run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_4, 1, stdout);
+    // run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_5, 0, stdout);
     run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_5, 1, stdout);
     return 0;
 }

@@ -3,20 +3,50 @@
 #include <stdio.h>
 #include "network.h"
 
-#define GRAVITATIONAL_CONSTANT 1.1
-#define REPULSIVE_CONSTANT 100.0
-#define DESIRED_DISTANCE 150.0
-#define MASS 3.0
-#define MAX_ITERATIONS 1000000
-
 typedef struct coordinate
 {
     double x;
     double y;
 } coordinate;
 
-void spring_embedder(const network_t *network, double max_velocity, double scale, coordinate *coordinates_ret);
+typedef enum line_t
+{
+    DOTTED_LINE,
+    DASHED_LINE,
+    SOLID_LINE
+} line_t;
 
-void print_graph(const network_t *network, const coordinate *coordinates, FILE *file);
+typedef enum offset_t
+{
+    OFFSET_UP,
+    OFFSET_DOWN,
+    NO_OFFSET
+} offset_t;
+
+typedef struct path_drawing
+{
+    line_t line;
+    offset_t offset;
+    path_t *path;
+} path_drawing;
+
+typedef struct bar_plot
+{
+    uint64_t samples_count;
+    uint64_t data_points_count;
+    coordinate *data_points;
+    char **legends;
+    char *y_label;
+} bar_plot;
+
+typedef char *(*label_generator)(void *data, uint64_t from, uint64_t to);
+
+void print_graph(const network_t *network, label_generator labeler, void *data, const coordinate *node_coordinates, path_drawing *paths, uint64_t paths_size, double x_scale, double y_scale, FILE *file);
+
+void print_plot(bar_plot plot, FILE *file);
+
+void print_prologue(FILE *file, char *title);
+void print_section(FILE *file, char *section);
+void print_epilogue(FILE *file);
 
 #endif
