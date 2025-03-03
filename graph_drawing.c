@@ -6,7 +6,9 @@ void print_graph(const network_t *network, label_generator labeler, void *data, 
     fprintf(file, "\\begin{tikzpicture}[node distance=2cm,>=stealth',auto, every place/.style={draw}, baseline]\n");
     for (uint64_t i = 0; i < network->node_count; i++)
     {
-        // fprintf(file, "\\coordinate(C%ld) at (%.3f,%.3f);\n", i + 1, node_coordinates[i].x * x_scale, node_coordinates[i].y * y_scale);
+        fprintf(file, "\\coordinate(C%ld) at (%.3f,%.3f);\n", i + 1, node_coordinates[i].x * x_scale, node_coordinates[i].y * y_scale);
+        fprintf(file, "\\coordinate(B%ld) at (%.3f,%.3f);\n", i + 1, node_coordinates[i].x * x_scale, (node_coordinates[i].y - 0.5) * y_scale);
+        fprintf(file, "\\coordinate(A%ld) at (%.3f,%.3f);\n", i + 1, node_coordinates[i].x * x_scale, (node_coordinates[i].y + 0.5) * y_scale);
         fprintf(file, "\\node [place] (S%ld) at (%.3f,%.3f) {%ld};\n", i + 1, node_coordinates[i].x * x_scale, node_coordinates[i].y * y_scale, i + 1);
     }
     for (uint64_t i = 0; i < network->node_count; i++)
@@ -22,7 +24,23 @@ void print_graph(const network_t *network, label_generator labeler, void *data, 
             }
         }
     }
+    for (uint64_t i = 0; i < paths_size; i++)
+    {
+        for (uint64_t j = 0; j < paths[i].path->length; j++)
+        {
+            fprintf(file, "\\definecolor{color%ld}{RGB}{%d,%d,%d}", i * network->node_count + j, paths[i].color.red, paths[i].color.green, paths[i].color.blue);
+            fprintf(file, "\\path[->%s,%s%ld, line width = 0.5mm] (B%ld) edge node {%s} (B%ld);\n", paths[i].line == SOLID_LINE ? "" : paths[i].line == DOTTED_LINE ? ",dotted"
+                                                                                                                                                : ",dashed",
+                    "color", i * network->node_count + j,
+                    paths[i].path->nodes[j] + 1, "", paths[i].path->nodes[j + 1] + 1);
+        }
+    }
     fprintf(file, " \\end{tikzpicture}\n");
+}
+
+void print_linebreak(FILE *file)
+{
+    fprintf(file, "\\bigskip\\\\\n");
 }
 
 void print_plot(bar_plot plot, FILE *file)

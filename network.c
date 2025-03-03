@@ -19,7 +19,7 @@ void print_path(const path_t *p, FILE *file)
     {
         if (p->length == -1 || p->distance == -1)
             break;
-        fprintf(file, "%ld", p->nodes[j] + 1);
+        fprintf(file, "%ld", p->nodes[j]);
         if (j != p->length)
             fprintf(file, "->");
     }

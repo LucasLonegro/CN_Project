@@ -47,6 +47,28 @@ void print_assignment(const assignment_t assignment, FILE *file)
     }
 }
 
+char *noop_labeler(void *data, uint64_t from, uint64_t to)
+{
+    return "";
+}
+
+hex_color get_hex_color(assignment_t assignment)
+{
+    hex_color ret = {
+        .blue = (assignment.start_slot * ((double)127 / MAX_SPECTRAL_SLOTS)) + 128,
+        .red = ((double)assignment.start_slot / MAX_SPECTRAL_SLOTS) / 127 ? ((double)assignment.start_slot / MAX_SPECTRAL_SLOTS) * 127 : 255 - ((double)assignment.start_slot / MAX_SPECTRAL_SLOTS) * 127,
+        .green = 255 - (assignment.start_slot * ((double)127 / MAX_SPECTRAL_SLOTS))};
+    return ret;
+}
+
+void print_assignment_latex(const network_t *network, const assignment_t assignment, coordinate *coordinates, const assignment_t protection, FILE *file)
+{
+    path_drawing assignment_path = {.line = SOLID_LINE, .offset = OFFSET_DOWN, .path = assignment.path, .color = get_hex_color(assignment)};
+    path_drawing protection_path = {.line = DOTTED_LINE, .offset = OFFSET_DOWN, .path = protection.path, .color = get_hex_color(protection)};
+    path_drawing paths[] = {assignment_path, protection_path};
+    print_graph(network, noop_labeler, NULL, coordinates, paths, protection.path->length == -1 ? 1 : 2, 0.8, 0.6, file);
+}
+
 __ssize_t highest_fsu_in_assignent(assignment_t *assignment)
 {
     if (assignment->is_split)
@@ -134,45 +156,9 @@ char *read_link_weight(void *data, uint64_t from, uint64_t to)
     return _data->buffer;
 }
 
-void run_requests(const network_t *network, const uint64_t *connection_requests, int ascending, FILE *file, protection_type protection, routing_algorithms routing_a, slot_assignment_algorithms slot_a, modulation_format_assignment_algorithms modulation_a)
+void print_report(const network_t *network, assignment_t *assignments, uint64_t requests_count, assignment_t *protections, dynamic_char_array *used_frequency_slots, uint64_t *total_link_loads, FILE *file)
 {
     uint64_t topology_node_count = network->node_count;
-    connection_request *requests = calloc(topology_node_count * topology_node_count, sizeof(connection_request));
-    uint64_t requests_count = 0;
-    for (uint64_t i = 0; i < topology_node_count; i++)
-    {
-        for (uint64_t j = 0; j < topology_node_count; j++)
-        {
-            if (connection_requests[i * topology_node_count + j] > 0 && i != j)
-            {
-                requests[requests_count].load = connection_requests[i * topology_node_count + j];
-                requests[requests_count].from_node_id = i;
-                requests[requests_count].to_node_id = j;
-                requests_count++;
-            }
-        }
-    }
-    bubble_sort_connection_requests(requests, requests_count, ascending);
-
-    assignment_t *assignments = calloc(requests_count, sizeof(assignment_t));
-    assignment_t *protections = calloc(requests_count, sizeof(assignment_t));
-
-    dynamic_char_array *used_frequency_slots = calloc(topology_node_count * topology_node_count, sizeof(dynamic_char_array));
-
-    path_t **to_free = generate_routing(network, requests, requests_count, formats, MODULATION_FORMATS_DIM, assignments, protections, protection, used_frequency_slots, routing_a, slot_a, modulation_a);
-
-    uint64_t *total_link_loads = calloc(topology_node_count * topology_node_count, sizeof(uint64_t));
-    for (uint64_t i = 0; i < requests_count; i++)
-    {
-        assignment_t assignment = assignments[i];
-        for (uint64_t node = 0; node < assignment.path->length; node++)
-        {
-            if (assignment.path->length == -1)
-                break;
-            total_link_loads[assignment.path->nodes[node] * topology_node_count + assignment.path->nodes[node + 1]] += assignment.load;
-        }
-    }
-
     fprintf(file, COLOR_BOLD_BLUE "\nRMSAs\n" COLOR_OFF);
     for (uint64_t i = 0; i < requests_count; i++)
     {
@@ -272,6 +258,14 @@ void run_requests(const network_t *network, const uint64_t *connection_requests,
     bar_plot p = {.data_points_count = 4, .samples_count = 1, .legends = legends, .y_label = "Frequency", .data_points = (data_point *)points, .x_labels_count = 4, .x_labels = x_labels};
     print_section(f, "Entropy");
     print_plot(p, f);
+
+    print_section(f, "Assignments");
+    for (uint64_t i = 0; i < requests_count; i++)
+    {
+        print_assignment_latex(network, assignments[i], c, protections[i], f);
+        if ((i % 3) == 2 && i != requests_count - 1)
+            print_linebreak(f);
+    }
     print_epilogue(f);
     fclose(f);
 
@@ -286,7 +280,50 @@ void run_requests(const network_t *network, const uint64_t *connection_requests,
             free_assignment(protections[i].split);
         }
     }
+}
+
+void run_requests(const network_t *network, const uint64_t *connection_requests, int ascending, FILE *file, protection_type protection, routing_algorithms routing_a, slot_assignment_algorithms slot_a, modulation_format_assignment_algorithms modulation_a)
+{
+    uint64_t topology_node_count = network->node_count;
+    connection_request *requests = calloc(topology_node_count * topology_node_count, sizeof(connection_request));
+    uint64_t requests_count = 0;
+    for (uint64_t i = 0; i < topology_node_count; i++)
+    {
+        for (uint64_t j = 0; j < topology_node_count; j++)
+        {
+            if (connection_requests[i * topology_node_count + j] > 0 && i != j)
+            {
+                requests[requests_count].load = connection_requests[i * topology_node_count + j];
+                requests[requests_count].from_node_id = i;
+                requests[requests_count].to_node_id = j;
+                requests_count++;
+            }
+        }
+    }
+    bubble_sort_connection_requests(requests, requests_count, ascending);
+
+    assignment_t *assignments = calloc(requests_count, sizeof(assignment_t));
+    assignment_t *protections = calloc(requests_count, sizeof(assignment_t));
+
+    dynamic_char_array *used_frequency_slots = calloc(topology_node_count * topology_node_count, sizeof(dynamic_char_array));
+
+    path_t **to_free = generate_routing(network, requests, requests_count, formats, MODULATION_FORMATS_DIM, assignments, protections, protection, used_frequency_slots, routing_a, slot_a, modulation_a);
+
+    uint64_t *total_link_loads = calloc(topology_node_count * topology_node_count, sizeof(uint64_t));
+    for (uint64_t i = 0; i < requests_count; i++)
+    {
+        assignment_t assignment = assignments[i];
+        for (uint64_t node = 0; node < assignment.path->length; node++)
+        {
+            if (assignment.path->length == -1)
+                break;
+            total_link_loads[assignment.path->nodes[node] * topology_node_count + assignment.path->nodes[node + 1]] += assignment.load;
+        }
+    }
     free(requests);
+
+    print_report(network, assignments, requests_count, protections, used_frequency_slots, total_link_loads, file);
+
     free(total_link_loads);
     free(assignments);
     free(protections);

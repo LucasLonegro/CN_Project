@@ -23,11 +23,19 @@ typedef enum offset_t
     NO_OFFSET
 } offset_t;
 
+typedef struct hex_color
+{
+    unsigned char red;
+    unsigned char green;
+    unsigned char blue;
+} hex_color;
+
 typedef struct path_drawing
 {
     line_t line;
     offset_t offset;
-    path_t *path;
+    const path_t *path;
+    hex_color color;
 } path_drawing;
 
 typedef struct data_point
@@ -54,6 +62,7 @@ void print_graph(const network_t *network, label_generator labeler, void *data, 
 void print_plot(bar_plot plot, FILE *file);
 
 void print_prologue(FILE *file, char *title);
+void print_linebreak(FILE *file);
 void print_section(FILE *file, char *section);
 void print_epilogue(FILE *file);
 
