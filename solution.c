@@ -9,7 +9,6 @@
 #include "routing_solution.h"
 #include "graph_drawing.h"
 
-
 #define COLOR_BOLD "\e[1m"
 #define COLOR_BOLD_SLOW_BLINKING "\e[1;5m"
 #define COLOR_BOLD_SLOW_BLINKING_RED "\e[1;5;31m"
@@ -125,7 +124,7 @@ void bubble_sort_connection_requests(connection_request *requests, uint64_t requ
 typedef struct read_link_weight_data_t
 {
     char buffer[256];
-    network_t *network;
+    const network_t *network;
 } read_link_weight_data_t;
 
 char *read_link_weight(void *data, uint64_t from, uint64_t to)
@@ -135,15 +134,9 @@ char *read_link_weight(void *data, uint64_t from, uint64_t to)
     return _data->buffer;
 }
 
-void run_solution(uint64_t topology_node_count, uint64_t links[][3], uint64_t links_count, const uint64_t *connection_requests, int ascending, FILE *file)
+void run_requests(const network_t *network, const uint64_t *connection_requests, int ascending, FILE *file)
 {
-    network_t *network = new_network(topology_node_count);
-
-    for (uint64_t i = 0; i < links_count; i++)
-    {
-        set_link_weight(network, links[i][0] - 1, links[i][1] - 1, links[i][2]);
-    }
-
+    uint64_t topology_node_count = network->node_count;
     connection_request *requests = calloc(topology_node_count * topology_node_count, sizeof(connection_request));
     uint64_t requests_count = 0;
     for (uint64_t i = 0; i < topology_node_count; i++)
@@ -226,33 +219,6 @@ void run_solution(uint64_t topology_node_count, uint64_t links[][3], uint64_t li
     }
     fprintf(file, "\n");
 
-    fprintf(file, COLOR_BOLD_BLUE "Path length distribution:\n" COLOR_OFF);
-    for (uint64_t i = 0, request_index = 0; i < topology_node_count; i++)
-    {
-        for (uint64_t j = 0; j < topology_node_count && request_index < requests_count; j++)
-        {
-            if (links[i * topology_node_count + j] > 0 && i != j)
-            {
-                fprintf(file, "%ld", assignments[request_index].path->distance);
-                if (assignments[request_index].is_split)
-                {
-                    fprintf(file, " [%ld]", assignments[request_index].path->distance);
-                }
-                else
-                {
-                    fprintf(file, "\t");
-                }
-                fprintf(file, "\t");
-                request_index++;
-            }
-            else
-            {
-                printf("\t\t");
-            }
-        }
-        fprintf(file, "\n");
-    }
-
     fprintf(file, COLOR_BOLD_BLUE "Utilization entropies [thousandths]:\n" COLOR_OFF);
     for (uint64_t i = 0; i < topology_node_count; i++)
     {
@@ -293,19 +259,21 @@ void run_solution(uint64_t topology_node_count, uint64_t links[][3], uint64_t li
 
     fprintf(file, "\nEND\n");
 
-    mkdir("./reports", S_IRWXU|S_IRWXG|S_IROTH);
+    mkdir("./reports", S_IRWXU | S_IRWXG | S_IROTH);
     FILE *f = fopen("reports/out.tex", "w+");
     print_prologue(f, "italian");
     print_section(f, "Topology");
     coordinate c[] = {{.x = 2.0, .y = 4.0}, {.x = 3.5, .y = 4.0}, {.x = 0.5, .y = 4.0}, {.x = 5.0, .y = 4.0}, {.x = 0.0, .y = 2.0}, {.x = 0.5, .y = 0.0}, {.x = 2.0, .y = 2.0}, {.x = 4.0, .y = 2.0}, {.x = 2.8, .y = 0.0}, {.x = 4.0, .y = 0.0}};
     read_link_weight_data_t data = {.network = network};
     print_graph(network, read_link_weight, &data, c, NULL, 0, 1.5, 1.0, f);
-    coordinate points[1][4] = {{{.x = 0.1, .y = 10}, {.x = 0.2, .y = 20}, {.x = 0.3, .y = 22}, {.x = 0.4, .y = 11}}};
+    data_point points[1][4] = {{{.x = "a", .y = 10}, {.x = "b", .y = 20}, {.x = "c", .y = 22}, {.x = "d", .y = 11}}};
+    char *x_labels[] = {"a", "b","c","d"};
     char *legends[] = {"Range"};
-    bar_plot p = {.data_points_count = 4, .samples_count = 1, .legends = legends, .y_label = "Frequency", .data_points = (coordinate *)points};
+    bar_plot p = {.data_points_count = 4, .samples_count = 1, .legends = legends, .y_label = "Frequency", .data_points = (data_point *)points, .x_labels_count = 4, .x_labels = x_labels};
     print_section(f, "Entropy");
     print_plot(p, f);
     print_epilogue(f);
+    fclose(f);
 
     for (uint64_t i = 0; i < requests_count; i++)
     {
@@ -334,7 +302,46 @@ void run_solution(uint64_t topology_node_count, uint64_t links[][3], uint64_t li
             free(used_frequency_slots[i].elements);
     }
     free(used_frequency_slots);
-    free_network(network);
+}
+
+network_t *build_network(uint64_t topology_node_count, uint64_t links[][3], uint64_t links_count)
+{
+    network_t *network = new_network(topology_node_count);
+
+    for (uint64_t i = 0; i < links_count; i++)
+    {
+        set_link_weight(network, links[i][0] - 1, links[i][1] - 1, links[i][2]);
+    }
+
+    return network;
+}
+
+void run_solutions()
+{
+    network_t *german_n = build_network(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE);
+    // run_requests(german_n, (uint64_t *)g7_1, 0, stdout);
+    // run_requests(german_n, (uint64_t *)g7_1, 1, stdout);
+    // run_requests(german_n, (uint64_t *)g7_2, 0, stdout);
+    // run_requests(german_n, (uint64_t *)g7_2, 1, stdout);
+    // run_requests(german_n, (uint64_t *)g7_3, 0, stdout);
+    // run_requests(german_n, (uint64_t *)g7_3, 1, stdout);
+    // run_requests(german_n, (uint64_t *)g7_4, 0, stdout);
+    // run_requests(german_n, (uint64_t *)g7_4, 1, stdout);
+    // run_requests(german_n, (uint64_t *)g7_5, 0, stdout);
+    // run_requests(german_n, (uint64_t *)g7_5, 1, stdout);
+    free_network(german_n);
+    network_t *italian_n = build_network(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE);
+    // run_requests(italian_n, (uint64_t *)IT10_1, 0, stdout);
+    // run_requests(italian_n, (uint64_t *)IT10_1, 1, stdout);
+    // run_requests(italian_n, (uint64_t *)IT10_2, 0, stdout);
+    // run_requests(italian_n, (uint64_t *)IT10_2, 1, stdout);
+    // run_requests(italian_n, (uint64_t *)IT10_3, 0, stdout);
+    // run_requests(italian_n, (uint64_t *)IT10_3, 1, stdout);
+    // run_requests(italian_n, (uint64_t *)IT10_4, 0, stdout);
+    // run_requests(italian_n, (uint64_t *)IT10_4, 1, stdout);
+    // run_requests(italian_n, (uint64_t *)IT10_5, 0, stdout);
+    run_requests(italian_n, (uint64_t *)IT10_5, 1, stdout);
+    free_network(italian_n);
 }
 
 int main(void)
@@ -359,6 +366,6 @@ int main(void)
     // run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_4, 0, stdout);
     // run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_4, 1, stdout);
     // run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_5, 0, stdout);
-    run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_5, 1, stdout);
+    run_solutions();
     return 0;
 }

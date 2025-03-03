@@ -36,9 +36,22 @@ void print_plot(bar_plot plot, FILE *file)
 \n	enlargelimits=0.05,\
 \n	legend style={at={(0.5,-0.1)},\
 \n	anchor=north,legend columns=-1},\
-\n	ybar interval=0.7,\
-\n]",
+\n	ybar=0.7,\
+\n  xminorgrids=true,\
+\n  minor tick num=1,\
+\n  major tick style={draw=none},\
+\n  enlarge x limits=0.125,\
+\n  symbolic x coords={",
             plot.y_label);
+    for (uint64_t i = 0; i < plot.x_labels_count; i++)
+    {
+        fprintf(file, "%s", plot.x_labels[i]);
+        if (i != plot.x_labels_count - 1)
+        {
+            fprintf(file, ",");
+        }
+    }
+    fprintf(file, "},\n]");
     for (uint64_t i = 0; i < plot.samples_count; i++)
     {
         fprintf(file,
@@ -46,7 +59,7 @@ void print_plot(bar_plot plot, FILE *file)
 \n	coordinates {");
         for (uint64_t j = 0; j < plot.data_points_count; j++)
         {
-            fprintf(file, "(%.3f,%.3f) ", plot.data_points[i * plot.data_points_count + j].x, plot.data_points[i * plot.data_points_count + j].y);
+            fprintf(file, "(%s,%.3f) ", plot.data_points[i * plot.data_points_count + j].x, plot.data_points[i * plot.data_points_count + j].y);
         }
         fprintf(file, "};");
     }

@@ -30,11 +30,19 @@ typedef struct path_drawing
     path_t *path;
 } path_drawing;
 
+typedef struct data_point
+{
+    double y;
+    char *x;
+} data_point;
+
 typedef struct bar_plot
 {
     uint64_t samples_count;
     uint64_t data_points_count;
-    coordinate *data_points;
+    data_point *data_points;
+    char **x_labels;
+    uint64_t x_labels_count;
     char **legends;
     char *y_label;
 } bar_plot;
