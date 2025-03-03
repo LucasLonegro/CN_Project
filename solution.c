@@ -134,7 +134,7 @@ char *read_link_weight(void *data, uint64_t from, uint64_t to)
     return _data->buffer;
 }
 
-void run_requests(const network_t *network, const uint64_t *connection_requests, int ascending, FILE *file)
+void run_requests(const network_t *network, const uint64_t *connection_requests, int ascending, FILE *file, protection_type protection, routing_algorithms routing_a, slot_assignment_algorithms slot_a, modulation_format_assignment_algorithms modulation_a)
 {
     uint64_t topology_node_count = network->node_count;
     connection_request *requests = calloc(topology_node_count * topology_node_count, sizeof(connection_request));
@@ -159,7 +159,7 @@ void run_requests(const network_t *network, const uint64_t *connection_requests,
 
     dynamic_char_array *used_frequency_slots = calloc(topology_node_count * topology_node_count, sizeof(dynamic_char_array));
 
-    path_t **to_free = generate_routing(network, requests, requests_count, formats, MODULATION_FORMATS_DIM, assignments, protections, SHARED_PROTECTION, used_frequency_slots, LEAST_USED_PATH_JOINT, FIRST_FIT_SLOT, DEFAULT_MODULATION);
+    path_t **to_free = generate_routing(network, requests, requests_count, formats, MODULATION_FORMATS_DIM, assignments, protections, protection, used_frequency_slots, routing_a, slot_a, modulation_a);
 
     uint64_t *total_link_loads = calloc(topology_node_count * topology_node_count, sizeof(uint64_t));
     for (uint64_t i = 0; i < requests_count; i++)
@@ -267,7 +267,7 @@ void run_requests(const network_t *network, const uint64_t *connection_requests,
     read_link_weight_data_t data = {.network = network};
     print_graph(network, read_link_weight, &data, c, NULL, 0, 1.5, 1.0, f);
     data_point points[1][4] = {{{.x = "a", .y = 10}, {.x = "b", .y = 20}, {.x = "c", .y = 22}, {.x = "d", .y = 11}}};
-    char *x_labels[] = {"a", "b","c","d"};
+    char *x_labels[] = {"a", "b", "c", "d"};
     char *legends[] = {"Range"};
     bar_plot p = {.data_points_count = 4, .samples_count = 1, .legends = legends, .y_label = "Frequency", .data_points = (data_point *)points, .x_labels_count = 4, .x_labels = x_labels};
     print_section(f, "Entropy");
@@ -319,28 +319,28 @@ network_t *build_network(uint64_t topology_node_count, uint64_t links[][3], uint
 void run_solutions()
 {
     network_t *german_n = build_network(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE);
-    // run_requests(german_n, (uint64_t *)g7_1, 0, stdout);
-    // run_requests(german_n, (uint64_t *)g7_1, 1, stdout);
-    // run_requests(german_n, (uint64_t *)g7_2, 0, stdout);
-    // run_requests(german_n, (uint64_t *)g7_2, 1, stdout);
-    // run_requests(german_n, (uint64_t *)g7_3, 0, stdout);
-    // run_requests(german_n, (uint64_t *)g7_3, 1, stdout);
-    // run_requests(german_n, (uint64_t *)g7_4, 0, stdout);
-    // run_requests(german_n, (uint64_t *)g7_4, 1, stdout);
-    // run_requests(german_n, (uint64_t *)g7_5, 0, stdout);
-    // run_requests(german_n, (uint64_t *)g7_5, 1, stdout);
+    // run_requests(german_n, (uint64_t *)g7_1, 0, stdout,SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    // run_requests(german_n, (uint64_t *)g7_1, 1, stdout,SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    // run_requests(german_n, (uint64_t *)g7_2, 0, stdout,SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    // run_requests(german_n, (uint64_t *)g7_2, 1, stdout,SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    // run_requests(german_n, (uint64_t *)g7_3, 0, stdout,SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    // run_requests(german_n, (uint64_t *)g7_3, 1, stdout,SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    // run_requests(german_n, (uint64_t *)g7_4, 0, stdout,SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    // run_requests(german_n, (uint64_t *)g7_4, 1, stdout,SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    // run_requests(german_n, (uint64_t *)g7_5, 0, stdout,SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    // run_requests(german_n, (uint64_t *)g7_5, 1, stdout,SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
     free_network(german_n);
     network_t *italian_n = build_network(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE);
-    // run_requests(italian_n, (uint64_t *)IT10_1, 0, stdout);
-    // run_requests(italian_n, (uint64_t *)IT10_1, 1, stdout);
-    // run_requests(italian_n, (uint64_t *)IT10_2, 0, stdout);
-    // run_requests(italian_n, (uint64_t *)IT10_2, 1, stdout);
-    // run_requests(italian_n, (uint64_t *)IT10_3, 0, stdout);
-    // run_requests(italian_n, (uint64_t *)IT10_3, 1, stdout);
-    // run_requests(italian_n, (uint64_t *)IT10_4, 0, stdout);
-    // run_requests(italian_n, (uint64_t *)IT10_4, 1, stdout);
-    // run_requests(italian_n, (uint64_t *)IT10_5, 0, stdout);
-    run_requests(italian_n, (uint64_t *)IT10_5, 1, stdout);
+    // run_requests(italian_n, (uint64_t *)IT10_1, 0, stdout, SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    // run_requests(italian_n, (uint64_t *)IT10_1, 1, stdout, SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    // run_requests(italian_n, (uint64_t *)IT10_2, 0, stdout, SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    // run_requests(italian_n, (uint64_t *)IT10_2, 1, stdout, SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    // run_requests(italian_n, (uint64_t *)IT10_3, 0, stdout, SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    // run_requests(italian_n, (uint64_t *)IT10_3, 1, stdout, SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    // run_requests(italian_n, (uint64_t *)IT10_4, 0, stdout, SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    // run_requests(italian_n, (uint64_t *)IT10_4, 1, stdout, SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    // run_requests(italian_n, (uint64_t *)IT10_5, 0, stdout, SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(italian_n, (uint64_t *)IT10_5, 1, stdout, SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
     free_network(italian_n);
 }
 
