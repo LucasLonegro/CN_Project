@@ -47,7 +47,7 @@ void print_assignment(const assignment_t assignment, FILE *file)
     }
 }
 
-char *noop_labeler(void *data, uint64_t from, uint64_t to)
+char *noop_labeler(const void *data, uint64_t from, uint64_t to)
 {
     return "";
 }
@@ -61,12 +61,33 @@ hex_color get_hex_color(assignment_t assignment)
     return ret;
 }
 
-void print_assignment_latex(const network_t *network, const assignment_t assignment, coordinate *coordinates, const assignment_t protection, FILE *file)
+typedef struct read_slots_data_t
 {
-    path_drawing assignment_path = {.line = SOLID_LINE, .offset = OFFSET_DOWN, .path = assignment.path, .color = get_hex_color(assignment)};
-    path_drawing protection_path = {.line = DOTTED_LINE, .offset = OFFSET_DOWN, .path = protection.path, .color = get_hex_color(protection)};
+    char buffer[256];
+    const assignment_t *assignment;
+} read_slots_data_t;
+
+char *read_slots(const void *data, uint64_t from, uint64_t to)
+{
+    read_slots_data_t *_data = (read_slots_data_t *)data;
+    if (_data->assignment == NULL || _data->assignment->path == NULL || _data->assignment->path->length == -1)
+        return "";
+    if (from == _data->assignment->path->nodes[_data->assignment->path->length / 2])
+    {
+        snprintf(_data->buffer, sizeof(_data->buffer), "\\(\\{\\lambda_{%ld};\\lambda_{%ld}\\}\\)", _data->assignment->start_slot, _data->assignment->end_slot);
+        return _data->buffer;
+    }
+    return "";
+}
+
+void print_assignment_latex(const network_t *network, assignment_t *assignment, coordinate *coordinates, assignment_t *protection, FILE *file)
+{
+    read_slots_data_t data1 = {.assignment = assignment};
+    read_slots_data_t data2 = {.assignment = protection};
+    path_drawing assignment_path = {.line = SOLID_LINE, .offset = OFFSET_DOWN, .path = assignment->path, .color = get_hex_color(*assignment), .data = &data1, .labeler = read_slots};
+    path_drawing protection_path = {.line = DOTTED_LINE, .offset = OFFSET_DOWN, .path = protection->path, .color = get_hex_color(*protection), .data = &data2, .labeler = read_slots};
     path_drawing paths[] = {assignment_path, protection_path};
-    print_graph(network, noop_labeler, NULL, coordinates, paths, protection.path->length == -1 ? 1 : 2, 0.8, 0.6, file);
+    print_graph(network, noop_labeler, NULL, coordinates, paths, protection->path->length == -1 ? 1 : 2, 0.9, 0.8, file);
 }
 
 __ssize_t highest_fsu_in_assignent(assignment_t *assignment)
@@ -149,14 +170,14 @@ typedef struct read_link_weight_data_t
     const network_t *network;
 } read_link_weight_data_t;
 
-char *read_link_weight(void *data, uint64_t from, uint64_t to)
+char *read_link_weight(const void *data, uint64_t from, uint64_t to)
 {
     read_link_weight_data_t *_data = (read_link_weight_data_t *)data;
-    sprintf(_data->buffer, "%ld", get_link_weight(_data->network, from, to));
+    snprintf(_data->buffer, sizeof(_data->buffer), "%ld", get_link_weight(_data->network, from, to));
     return _data->buffer;
 }
 
-void print_report(const network_t *network, assignment_t *assignments, uint64_t requests_count, assignment_t *protections, dynamic_char_array *used_frequency_slots, uint64_t *total_link_loads, FILE *file)
+void print_report(const network_t *network, assignment_t *assignments, uint64_t requests_count, assignment_t *protections, dynamic_char_array *used_frequency_slots, uint64_t *total_link_loads, char *title, FILE *file)
 {
     uint64_t topology_node_count = network->node_count;
     fprintf(file, COLOR_BOLD_BLUE "\nRMSAs\n" COLOR_OFF);
@@ -247,7 +268,7 @@ void print_report(const network_t *network, assignment_t *assignments, uint64_t 
 
     mkdir("./reports", S_IRWXU | S_IRWXG | S_IROTH);
     FILE *f = fopen("reports/out.tex", "w+");
-    print_prologue(f, "italian");
+    print_prologue(f, title);
     print_section(f, "Topology");
     coordinate c[] = {{.x = 2.0, .y = 4.0}, {.x = 3.5, .y = 4.0}, {.x = 0.5, .y = 4.0}, {.x = 5.0, .y = 4.0}, {.x = 0.0, .y = 2.0}, {.x = 0.5, .y = 0.0}, {.x = 2.0, .y = 2.0}, {.x = 4.0, .y = 2.0}, {.x = 2.8, .y = 0.0}, {.x = 4.0, .y = 0.0}};
     read_link_weight_data_t data = {.network = network};
@@ -262,7 +283,7 @@ void print_report(const network_t *network, assignment_t *assignments, uint64_t 
     print_section(f, "Assignments");
     for (uint64_t i = 0; i < requests_count; i++)
     {
-        print_assignment_latex(network, assignments[i], c, protections[i], f);
+        print_assignment_latex(network, assignments + i, c, protections + i, f);
         if ((i % 3) == 2 && i != requests_count - 1)
             print_linebreak(f);
     }
@@ -282,7 +303,12 @@ void print_report(const network_t *network, assignment_t *assignments, uint64_t 
     }
 }
 
-void run_requests(const network_t *network, const uint64_t *connection_requests, int ascending, FILE *file, protection_type protection, routing_algorithms routing_a, slot_assignment_algorithms slot_a, modulation_format_assignment_algorithms modulation_a)
+void run_comparison(const network_t *network, const uint64_t *connection_requests, int ascending, FILE *file, routing_algorithms *routing_a, slot_assignment_algorithms *slot_a, modulation_format_assignment_algorithms *modulation_a)
+{
+    protection_type protection = NO_PROTECTION;
+}
+
+void run_requests(const network_t *network, const uint64_t *connection_requests, int ascending, char *title, FILE *file, protection_type protection, routing_algorithms routing_a, slot_assignment_algorithms slot_a, modulation_format_assignment_algorithms modulation_a)
 {
     uint64_t topology_node_count = network->node_count;
     connection_request *requests = calloc(topology_node_count * topology_node_count, sizeof(connection_request));
@@ -322,7 +348,7 @@ void run_requests(const network_t *network, const uint64_t *connection_requests,
     }
     free(requests);
 
-    print_report(network, assignments, requests_count, protections, used_frequency_slots, total_link_loads, file);
+    print_report(network, assignments, requests_count, protections, used_frequency_slots, total_link_loads, title, file);
 
     free(total_link_loads);
     free(assignments);
@@ -377,7 +403,7 @@ void run_solutions()
     // run_requests(italian_n, (uint64_t *)IT10_4, 0, stdout, SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
     // run_requests(italian_n, (uint64_t *)IT10_4, 1, stdout, SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
     // run_requests(italian_n, (uint64_t *)IT10_5, 0, stdout, SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
-    run_requests(italian_n, (uint64_t *)IT10_5, 1, stdout, SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(italian_n, (uint64_t *)IT10_5, 1, "Italian - Shared Protection - Custom Algorithm", stdout, SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
     free_network(italian_n);
 }
 

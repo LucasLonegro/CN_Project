@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include "network.h"
 
+typedef char *(*label_generator)(const void *data, uint64_t from, uint64_t to);
+
 typedef struct coordinate
 {
     double x;
@@ -36,6 +38,8 @@ typedef struct path_drawing
     offset_t offset;
     const path_t *path;
     hex_color color;
+    label_generator labeler;
+    void *data;
 } path_drawing;
 
 typedef struct data_point
@@ -55,7 +59,6 @@ typedef struct bar_plot
     char *y_label;
 } bar_plot;
 
-typedef char *(*label_generator)(void *data, uint64_t from, uint64_t to);
 
 void print_graph(const network_t *network, label_generator labeler, void *data, const coordinate *node_coordinates, path_drawing *paths, uint64_t paths_size, double x_scale, double y_scale, FILE *file);
 
