@@ -1,6 +1,7 @@
 #include "problem.h"
 
 coordinate italian_coordinates[ITALIAN_TOPOLOGY_SIZE] = {{.x = 2.0, .y = 4.0}, {.x = 3.5, .y = 4.0}, {.x = 0.5, .y = 4.0}, {.x = 5.0, .y = 4.0}, {.x = 0.0, .y = 2.0}, {.x = 0.5, .y = 0.0}, {.x = 2.0, .y = 2.0}, {.x = 4.0, .y = 2.0}, {.x = 2.8, .y = 0.0}, {.x = 4.0, .y = 0.0}};
+coordinate german_coordinates[GERMAN_TOPOLOGY_SIZE] = {{.x = 0.75, .y = 4.0}, {.x = 0.0, .y = 2.0}, {.x = 1.5, .y = 2.0}, {.x = 0.75, .y = 0.0}, {.x = 2.25, .y = 0.0}, {.x = 3.0, .y = 2.0}, {.x = 3.75, .y = 0.0}};
 
 modulation_format formats[MODULATION_FORMATS_DIM] = {{.line_rate = 100, .channel_bandwidth = 37.5, .maximum_length = 2000, .cost = 1.5, .name = "SC-DP-QPSK"},
                                                      {.line_rate = 200, .channel_bandwidth = 37.5, .maximum_length = 700, .cost = 2.0, .name = "SC-DP-16QAM"},

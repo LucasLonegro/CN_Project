@@ -23,6 +23,11 @@
 #define SHANNON_ENTROPY_PLOT_INTERVAL 0.05
 #define SHANNON_ENTROPY_PLOT_INTERVALS_COUNT 20
 
+#define TOPOLOGY_X_SCALE 2.0
+#define BIG_TOPOLOGY_X_SCALE 3.0
+#define TOPOLOGY_Y_SCALE 2.0
+#define BIG_TOPOLOGY_Y_SCALE 2.5
+
 #define REPORT_ASSIGNMENTS 0
 
 void free_assignment(assignment_t *assignment)
@@ -264,9 +269,9 @@ char *read_entropy(const void *data, uint64_t from, uint64_t to)
 void print_entropy(const network_t *network, coordinate *coordinates, uint64_t topology_node_count, FILE *f, dynamic_char_array *used_frequency_slots)
 {
     read_entropy_data_t data = {.used_frequency_slots = used_frequency_slots, .network = network, .entropy_calculator = utilization_entropy};
-    print_graph(network, read_entropy, &data, coordinates, NULL, 0, 2.5, 2.5, f, DRAW_ARROWS);
+    print_graph(network, read_entropy, &data, coordinates, NULL, 0, BIG_TOPOLOGY_X_SCALE, BIG_TOPOLOGY_Y_SCALE, f, DRAW_ARROWS);
     fprintf(f, "\n");
-    print_graph(network, read_entropy, &data, coordinates, NULL, 0, 2.5, 2.5, f, DRAW_ARROWS | REVERSE_ARROWS);
+    print_graph(network, read_entropy, &data, coordinates, NULL, 0, BIG_TOPOLOGY_X_SCALE, BIG_TOPOLOGY_Y_SCALE, f, DRAW_ARROWS | REVERSE_ARROWS);
     data_point points[ENTROPY_PLOT_INTERVALS_COUNT][1] = {0};
     char *link_loads_x_labels[ENTROPY_PLOT_INTERVALS_COUNT];
     uint64_t index = 0;
@@ -314,9 +319,9 @@ void print_entropy(const network_t *network, coordinate *coordinates, uint64_t t
 void print_shannon_entropy(const network_t *network, coordinate *coordinates, uint64_t topology_node_count, FILE *f, dynamic_char_array *used_frequency_slots)
 {
     read_entropy_data_t data = {.used_frequency_slots = used_frequency_slots, .network = network, .entropy_calculator = shannon_entropy};
-    print_graph(network, read_entropy, &data, coordinates, NULL, 0, 2.5, 2.5, f, DRAW_ARROWS);
+    print_graph(network, read_entropy, &data, coordinates, NULL, 0, BIG_TOPOLOGY_X_SCALE, BIG_TOPOLOGY_Y_SCALE, f, DRAW_ARROWS);
     fprintf(f, "\n");
-    print_graph(network, read_entropy, &data, coordinates, NULL, 0, 2.5, 2.5, f, DRAW_ARROWS | REVERSE_ARROWS);
+    print_graph(network, read_entropy, &data, coordinates, NULL, 0, BIG_TOPOLOGY_X_SCALE, BIG_TOPOLOGY_Y_SCALE, f, DRAW_ARROWS | REVERSE_ARROWS);
     data_point points[SHANNON_ENTROPY_PLOT_INTERVALS_COUNT][1] = {0};
     char *link_loads_x_labels[SHANNON_ENTROPY_PLOT_INTERVALS_COUNT];
     uint64_t index = 0;
@@ -367,7 +372,7 @@ void print_report(const network_t *network, assignment_t *assignments, uint64_t 
 
     print_section(f, "Topology");
     read_link_weight_data_t data = {.network = network};
-    print_graph(network, read_link_weight, &data, coordinates, NULL, 0, 1.5, 1.0, f, 0);
+    print_graph(network, read_link_weight, &data, coordinates, NULL, 0, BIG_TOPOLOGY_X_SCALE, BIG_TOPOLOGY_Y_SCALE, f, 0);
 
     uint64_t topology_node_count = network->node_count;
 
@@ -534,22 +539,36 @@ network_t *build_network(uint64_t topology_node_count, uint64_t links[][3], uint
     return network;
 }
 
-void run_solutions()
+void italian_no_protection_custom_algorithm(network_t *italian_n)
 {
-    mkdir("./reports", S_IRWXU | S_IRWXG | S_IROTH);
-    network_t *german_n = build_network(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE);
-    // run_requests(german_n, (uint64_t *)g7_1, 0, stdout,SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
-    // run_requests(german_n, (uint64_t *)g7_1, 1, stdout,SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
-    // run_requests(german_n, (uint64_t *)g7_2, 0, stdout,SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
-    // run_requests(german_n, (uint64_t *)g7_2, 1, stdout,SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
-    // run_requests(german_n, (uint64_t *)g7_3, 0, stdout,SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
-    // run_requests(german_n, (uint64_t *)g7_3, 1, stdout,SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
-    // run_requests(german_n, (uint64_t *)g7_4, 0, stdout,SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
-    // run_requests(german_n, (uint64_t *)g7_4, 1, stdout,SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
-    // run_requests(german_n, (uint64_t *)g7_5, 0, stdout,SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
-    // run_requests(german_n, (uint64_t *)g7_5, 1, stdout,SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
-    free_network(german_n);
-    network_t *italian_n = build_network(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE);
+    run_requests(italian_n, (uint64_t *)IT10_1, 0, "IT10 1 - No Protection - Custom Algorithm - Descending", "reports/IT10_1-NOP-DESC.tex", italian_coordinates, NO_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(italian_n, (uint64_t *)IT10_1, 1, "IT10 1 - No Protection - Custom Algorithm - Ascending", "reports/IT10_1-NOP-ASC.tex", italian_coordinates, NO_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(italian_n, (uint64_t *)IT10_2, 0, "IT10 2 - No Protection - Custom Algorithm - Descending", "reports/IT10_2-NOP-DESC.tex", italian_coordinates, NO_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(italian_n, (uint64_t *)IT10_2, 1, "IT10 2 - No Protection - Custom Algorithm - Ascending", "reports/IT10_2-NOP-ASC.tex", italian_coordinates, NO_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(italian_n, (uint64_t *)IT10_3, 0, "IT10 3 - No Protection - Custom Algorithm - Descending", "reports/IT10_3-NOP-DESC.tex", italian_coordinates, NO_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(italian_n, (uint64_t *)IT10_3, 1, "IT10 3 - No Protection - Custom Algorithm - Ascending", "reports/IT10_3-NOP-ASC.tex", italian_coordinates, NO_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(italian_n, (uint64_t *)IT10_4, 0, "IT10 4 - No Protection - Custom Algorithm - Descending", "reports/IT10_4-NOP-DESC.tex", italian_coordinates, NO_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(italian_n, (uint64_t *)IT10_4, 1, "IT10 4 - No Protection - Custom Algorithm - Ascending", "reports/IT10_4-NOP-ASC.tex", italian_coordinates, NO_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(italian_n, (uint64_t *)IT10_5, 0, "IT10 5 - No Protection - Custom Algorithm - Descending", "reports/IT10_5-NOP-DESC.tex", italian_coordinates, NO_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(italian_n, (uint64_t *)IT10_5, 1, "IT10 5 - No Protection - Custom Algorithm - Ascending", "reports/IT10_5-NOP-ASC.tex", italian_coordinates, NO_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+}
+
+void italian_dedicated_protection(network_t *italian_n)
+{
+    run_requests(italian_n, (uint64_t *)IT10_1, 0, "IT10 1 - Dedicated Protection - Custom Algorithm - Descending", "reports/IT10_1-DEDP-DESC.tex", italian_coordinates, DEDICATED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(italian_n, (uint64_t *)IT10_1, 1, "IT10 1 - Dedicated Protection - Custom Algorithm - Ascending", "reports/IT10_1-DEDP-ASC.tex", italian_coordinates, DEDICATED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(italian_n, (uint64_t *)IT10_2, 0, "IT10 2 - Dedicated Protection - Custom Algorithm - Descending", "reports/IT10_2-DEDP-DESC.tex", italian_coordinates, DEDICATED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(italian_n, (uint64_t *)IT10_2, 1, "IT10 2 - Dedicated Protection - Custom Algorithm - Ascending", "reports/IT10_2-DEDP-ASC.tex", italian_coordinates, DEDICATED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(italian_n, (uint64_t *)IT10_3, 0, "IT10 3 - Dedicated Protection - Custom Algorithm - Descending", "reports/IT10_3-DEDP-DESC.tex", italian_coordinates, DEDICATED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(italian_n, (uint64_t *)IT10_3, 1, "IT10 3 - Dedicated Protection - Custom Algorithm - Ascending", "reports/IT10_3-DEDP-ASC.tex", italian_coordinates, DEDICATED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(italian_n, (uint64_t *)IT10_4, 0, "IT10 4 - Dedicated Protection - Custom Algorithm - Descending", "reports/IT10_4-DEDP-DESC.tex", italian_coordinates, DEDICATED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(italian_n, (uint64_t *)IT10_4, 1, "IT10 4 - Dedicated Protection - Custom Algorithm - Ascending", "reports/IT10_4-DEDP-ASC.tex", italian_coordinates, DEDICATED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(italian_n, (uint64_t *)IT10_5, 0, "IT10 5 - Dedicated Protection - Custom Algorithm - Descending", "reports/IT10_5-DEDP-DESC.tex", italian_coordinates, DEDICATED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(italian_n, (uint64_t *)IT10_5, 1, "IT10 5 - Dedicated Protection - Custom Algorithm - Ascending", "reports/IT10_5-DEDP-ASC.tex", italian_coordinates, DEDICATED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+}
+
+void italian_shared_protection(network_t *italian_n)
+{
     run_requests(italian_n, (uint64_t *)IT10_1, 0, "IT10 1 - Shared Protection - Custom Algorithm - Descending", "reports/IT10_1-SHP-DESC.tex", italian_coordinates, SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
     run_requests(italian_n, (uint64_t *)IT10_1, 1, "IT10 1 - Shared Protection - Custom Algorithm - Ascending", "reports/IT10_1-SHP-ASC.tex", italian_coordinates, SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
     run_requests(italian_n, (uint64_t *)IT10_2, 0, "IT10 2 - Shared Protection - Custom Algorithm - Descending", "reports/IT10_2-SHP-DESC.tex", italian_coordinates, SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
@@ -560,6 +579,93 @@ void run_solutions()
     run_requests(italian_n, (uint64_t *)IT10_4, 1, "IT10 4 - Shared Protection - Custom Algorithm - Ascending", "reports/IT10_4-SHP-ASC.tex", italian_coordinates, SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
     run_requests(italian_n, (uint64_t *)IT10_5, 0, "IT10 5 - Shared Protection - Custom Algorithm - Descending", "reports/IT10_5-SHP-DESC.tex", italian_coordinates, SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
     run_requests(italian_n, (uint64_t *)IT10_5, 1, "IT10 5 - Shared Protection - Custom Algorithm - Ascending", "reports/IT10_5-SHP-ASC.tex", italian_coordinates, SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+}
+
+void italian_benchmark(network_t *italian_n)
+{
+    run_requests(italian_n, (uint64_t *)IT10_1, 0, "IT10 1 - No Protection - Benchmarking Algorithm - Descending", "reports/IT10_1-BENCHMARK-DESC.tex", italian_coordinates, NO_PROTECTION, FIRST_FIT_SLOT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(italian_n, (uint64_t *)IT10_1, 1, "IT10 1 - No Protection - Benchmarking Algorithm - Ascending", "reports/IT10_1-BENCHMARK-ASC.tex", italian_coordinates, NO_PROTECTION, FIRST_FIT_SLOT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(italian_n, (uint64_t *)IT10_2, 0, "IT10 2 - No Protection - Benchmarking Algorithm - Descending", "reports/IT10_2-BENCHMARK-DESC.tex", italian_coordinates, NO_PROTECTION, FIRST_FIT_SLOT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(italian_n, (uint64_t *)IT10_2, 1, "IT10 2 - No Protection - Benchmarking Algorithm - Ascending", "reports/IT10_2-BENCHMARK-ASC.tex", italian_coordinates, NO_PROTECTION, FIRST_FIT_SLOT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(italian_n, (uint64_t *)IT10_3, 0, "IT10 3 - No Protection - Benchmarking Algorithm - Descending", "reports/IT10_3-BENCHMARK-DESC.tex", italian_coordinates, NO_PROTECTION, FIRST_FIT_SLOT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(italian_n, (uint64_t *)IT10_3, 1, "IT10 3 - No Protection - Benchmarking Algorithm - Ascending", "reports/IT10_3-BENCHMARK-ASC.tex", italian_coordinates, NO_PROTECTION, FIRST_FIT_SLOT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(italian_n, (uint64_t *)IT10_4, 0, "IT10 4 - No Protection - Benchmarking Algorithm - Descending", "reports/IT10_4-BENCHMARK-DESC.tex", italian_coordinates, NO_PROTECTION, FIRST_FIT_SLOT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(italian_n, (uint64_t *)IT10_4, 1, "IT10 4 - No Protection - Benchmarking Algorithm - Ascending", "reports/IT10_4-BENCHMARK-ASC.tex", italian_coordinates, NO_PROTECTION, FIRST_FIT_SLOT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(italian_n, (uint64_t *)IT10_5, 0, "IT10 5 - No Protection - Benchmarking Algorithm - Descending", "reports/IT10_5-BENCHMARK-DESC.tex", italian_coordinates, NO_PROTECTION, FIRST_FIT_SLOT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(italian_n, (uint64_t *)IT10_5, 1, "IT10 5 - No Protection - Benchmarking Algorithm - Ascending", "reports/IT10_5-BENCHMARK-ASC.tex", italian_coordinates, NO_PROTECTION, FIRST_FIT_SLOT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+}
+
+void german_no_protection_custom_algorithm(network_t *german_n)
+{
+    run_requests(german_n, (uint64_t *)g7_1, 0, "g7 1 - No Protection - Custom Algorithm - Descending", "reports/g7_1-NOP-DESC.tex", german_coordinates, NO_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_1, 1, "g7 1 - No Protection - Custom Algorithm - Ascending", "reports/g7_1-NOP-ASC.tex", german_coordinates, NO_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_2, 0, "g7 2 - No Protection - Custom Algorithm - Descending", "reports/g7_2-NOP-DESC.tex", german_coordinates, NO_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_2, 1, "g7 2 - No Protection - Custom Algorithm - Ascending", "reports/g7_2-NOP-ASC.tex", german_coordinates, NO_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_3, 0, "g7 3 - No Protection - Custom Algorithm - Descending", "reports/g7_3-NOP-DESC.tex", german_coordinates, NO_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_3, 1, "g7 3 - No Protection - Custom Algorithm - Ascending", "reports/g7_3-NOP-ASC.tex", german_coordinates, NO_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_4, 0, "g7 4 - No Protection - Custom Algorithm - Descending", "reports/g7_4-NOP-DESC.tex", german_coordinates, NO_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_4, 1, "g7 4 - No Protection - Custom Algorithm - Ascending", "reports/g7_4-NOP-ASC.tex", german_coordinates, NO_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_5, 0, "g7 5 - No Protection - Custom Algorithm - Descending", "reports/g7_5-NOP-DESC.tex", german_coordinates, NO_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_5, 1, "g7 5 - No Protection - Custom Algorithm - Ascending", "reports/g7_5-NOP-ASC.tex", german_coordinates, NO_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+}
+
+void german_dedicated_protection(network_t *german_n)
+{
+    run_requests(german_n, (uint64_t *)g7_1, 0, "g7 1 - Dedicated Protection - Custom Algorithm - Descending", "reports/g7_1-DEDP-DESC.tex", german_coordinates, DEDICATED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_1, 1, "g7 1 - Dedicated Protection - Custom Algorithm - Ascending", "reports/g7_1-DEDP-ASC.tex", german_coordinates, DEDICATED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_2, 0, "g7 2 - Dedicated Protection - Custom Algorithm - Descending", "reports/g7_2-DEDP-DESC.tex", german_coordinates, DEDICATED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_2, 1, "g7 2 - Dedicated Protection - Custom Algorithm - Ascending", "reports/g7_2-DEDP-ASC.tex", german_coordinates, DEDICATED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_3, 0, "g7 3 - Dedicated Protection - Custom Algorithm - Descending", "reports/g7_3-DEDP-DESC.tex", german_coordinates, DEDICATED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_3, 1, "g7 3 - Dedicated Protection - Custom Algorithm - Ascending", "reports/g7_3-DEDP-ASC.tex", german_coordinates, DEDICATED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_4, 0, "g7 4 - Dedicated Protection - Custom Algorithm - Descending", "reports/g7_4-DEDP-DESC.tex", german_coordinates, DEDICATED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_4, 1, "g7 4 - Dedicated Protection - Custom Algorithm - Ascending", "reports/g7_4-DEDP-ASC.tex", german_coordinates, DEDICATED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_5, 0, "g7 5 - Dedicated Protection - Custom Algorithm - Descending", "reports/g7_5-DEDP-DESC.tex", german_coordinates, DEDICATED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_5, 1, "g7 5 - Dedicated Protection - Custom Algorithm - Ascending", "reports/g7_5-DEDP-ASC.tex", german_coordinates, DEDICATED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+}
+
+void german_shared_protection(network_t *german_n)
+{
+    run_requests(german_n, (uint64_t *)g7_1, 0, "g7 1 - Shared Protection - Custom Algorithm - Descending", "reports/g7_1-SHP-DESC.tex", german_coordinates, SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_1, 1, "g7 1 - Shared Protection - Custom Algorithm - Ascending", "reports/g7_1-SHP-ASC.tex", german_coordinates, SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_2, 0, "g7 2 - Shared Protection - Custom Algorithm - Descending", "reports/g7_2-SHP-DESC.tex", german_coordinates, SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_2, 1, "g7 2 - Shared Protection - Custom Algorithm - Ascending", "reports/g7_2-SHP-ASC.tex", german_coordinates, SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_3, 0, "g7 3 - Shared Protection - Custom Algorithm - Descending", "reports/g7_3-SHP-DESC.tex", german_coordinates, SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_3, 1, "g7 3 - Shared Protection - Custom Algorithm - Ascending", "reports/g7_3-SHP-ASC.tex", german_coordinates, SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_4, 0, "g7 4 - Shared Protection - Custom Algorithm - Descending", "reports/g7_4-SHP-DESC.tex", german_coordinates, SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_4, 1, "g7 4 - Shared Protection - Custom Algorithm - Ascending", "reports/g7_4-SHP-ASC.tex", german_coordinates, SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_5, 0, "g7 5 - Shared Protection - Custom Algorithm - Descending", "reports/g7_5-SHP-DESC.tex", german_coordinates, SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_5, 1, "g7 5 - Shared Protection - Custom Algorithm - Ascending", "reports/g7_5-SHP-ASC.tex", german_coordinates, SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+}
+
+void german_benchmark(network_t *german_n)
+{
+    run_requests(german_n, (uint64_t *)g7_1, 0, "g7 1 - No Protection - Benchmarking Algorithm - Descending", "reports/g7_1-BENCHMARK-DESC.tex", german_coordinates, NO_PROTECTION, FIRST_FIT_SLOT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_1, 1, "g7 1 - No Protection - Benchmarking Algorithm - Ascending", "reports/g7_1-BENCHMARK-ASC.tex", german_coordinates, NO_PROTECTION, FIRST_FIT_SLOT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_2, 0, "g7 2 - No Protection - Benchmarking Algorithm - Descending", "reports/g7_2-BENCHMARK-DESC.tex", german_coordinates, NO_PROTECTION, FIRST_FIT_SLOT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_2, 1, "g7 2 - No Protection - Benchmarking Algorithm - Ascending", "reports/g7_2-BENCHMARK-ASC.tex", german_coordinates, NO_PROTECTION, FIRST_FIT_SLOT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_3, 0, "g7 3 - No Protection - Benchmarking Algorithm - Descending", "reports/g7_3-BENCHMARK-DESC.tex", german_coordinates, NO_PROTECTION, FIRST_FIT_SLOT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_3, 1, "g7 3 - No Protection - Benchmarking Algorithm - Ascending", "reports/g7_3-BENCHMARK-ASC.tex", german_coordinates, NO_PROTECTION, FIRST_FIT_SLOT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_4, 0, "g7 4 - No Protection - Benchmarking Algorithm - Descending", "reports/g7_4-BENCHMARK-DESC.tex", german_coordinates, NO_PROTECTION, FIRST_FIT_SLOT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_4, 1, "g7 4 - No Protection - Benchmarking Algorithm - Ascending", "reports/g7_4-BENCHMARK-ASC.tex", german_coordinates, NO_PROTECTION, FIRST_FIT_SLOT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_5, 0, "g7 5 - No Protection - Benchmarking Algorithm - Descending", "reports/g7_5-BENCHMARK-DESC.tex", german_coordinates, NO_PROTECTION, FIRST_FIT_SLOT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_5, 1, "g7 5 - No Protection - Benchmarking Algorithm - Ascending", "reports/g7_5-BENCHMARK-ASC.tex", german_coordinates, NO_PROTECTION, FIRST_FIT_SLOT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+}
+
+void run_solutions()
+{
+    mkdir("./reports", S_IRWXU | S_IRWXG | S_IROTH);
+    network_t *german_n = build_network(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE);
+
+    german_benchmark(german_n);
+    german_no_protection_custom_algorithm(german_n);
+    german_dedicated_protection(german_n);
+    german_shared_protection(german_n);
+    free_network(german_n);
+    network_t *italian_n = build_network(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE);
+    italian_benchmark(italian_n);
+    italian_no_protection_custom_algorithm(italian_n);
+    italian_dedicated_protection(italian_n);
+    italian_shared_protection(italian_n);
     free_network(italian_n);
 }
 
