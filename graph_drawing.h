@@ -57,10 +57,15 @@ typedef struct bar_plot
     uint64_t x_labels_count;
     char **legends;
     char *y_label;
+    double width;
 } bar_plot;
 
+typedef enum print_graph_options{
+    DRAW_ARROWS = 1<<0,
+    REVERSE_ARROWS = 1<<1
+}print_graph_options;
 
-void print_graph(const network_t *network, label_generator labeler, void *data, const coordinate *node_coordinates, path_drawing *paths, uint64_t paths_size, double x_scale, double y_scale, FILE *file);
+void print_graph(const network_t *network, label_generator labeler, void *data, const coordinate *node_coordinates, path_drawing *paths, uint64_t paths_size, double x_scale, double y_scale, FILE *file, print_graph_options options);
 
 void print_plot(bar_plot plot, FILE *file);
 

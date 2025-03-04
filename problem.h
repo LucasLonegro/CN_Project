@@ -1,6 +1,7 @@
 #ifndef PRBLM_H
 #define PRBLM_H
 #include <stdint.h>
+#include "graph_drawing.h"
 
 #define ITALIAN_TOPOLOGY_SIZE 10
 #define ITALIAN_LINKS_SIZE 30
@@ -19,6 +20,9 @@ typedef struct modulation_format
 } modulation_format;
 
 extern modulation_format formats[MODULATION_FORMATS_DIM];
+
+extern coordinate italian_coordinates[ITALIAN_TOPOLOGY_SIZE];
+extern coordinate german_coordinates[GERMAN_TOPOLOGY_SIZE];
 
 extern uint64_t german_links[GERMAN_LINKS_SIZE][3];
 extern uint64_t g7_1[GERMAN_TOPOLOGY_SIZE][GERMAN_TOPOLOGY_SIZE];

@@ -15,6 +15,20 @@
 #define COLOR_BOLD_BLUE "\e[1;34m"
 #define COLOR_OFF "\e[m"
 
+#define LINK_USAGE_MAX_PLOT 2000
+#define LINK_USAGE_PLOT_INTERVAL 100
+
+#define PATH_LENGTH_MAX_PLOT 2000
+#define PATH_LENGTH_PLOT_INTERVAL 200
+#define BAR_PLOT_WIDTH 12
+#define BIG_BAR_PLOT_WIDTH 18
+
+#define ENTROPY_MAX_PLOT 1.0
+#define ENTROPY_PLOT_INTERVAL 0.01
+#define ENTROPY_PLOT_INTERVALS_COUNT 100
+#define SHANNON_ENTROPY_PLOT_INTERVAL 0.05
+#define SHANNON_ENTROPY_PLOT_INTERVALS_COUNT 20
+
 void free_assignment(assignment_t *assignment)
 {
     if (assignment->is_split)
@@ -87,7 +101,7 @@ void print_assignment_latex(const network_t *network, assignment_t *assignment, 
     path_drawing assignment_path = {.line = SOLID_LINE, .offset = OFFSET_DOWN, .path = assignment->path, .color = get_hex_color(*assignment), .data = &data1, .labeler = read_slots};
     path_drawing protection_path = {.line = DOTTED_LINE, .offset = OFFSET_DOWN, .path = protection->path, .color = get_hex_color(*protection), .data = &data2, .labeler = read_slots};
     path_drawing paths[] = {assignment_path, protection_path};
-    print_graph(network, noop_labeler, NULL, coordinates, paths, protection->path->length == -1 ? 1 : 2, 0.9, 0.8, file);
+    print_graph(network, noop_labeler, NULL, coordinates, paths, protection->path->length == -1 ? 1 : 2, 0.9, 0.8, file, 0);
 }
 
 __ssize_t highest_fsu_in_assignent(assignment_t *assignment)
@@ -177,32 +191,214 @@ char *read_link_weight(const void *data, uint64_t from, uint64_t to)
     return _data->buffer;
 }
 
-void print_report(const network_t *network, assignment_t *assignments, uint64_t requests_count, assignment_t *protections, dynamic_char_array *used_frequency_slots, uint64_t *total_link_loads, char *title, FILE *file)
+void print_link_usage(uint64_t topology_node_count, uint64_t *total_link_loads, FILE *f)
 {
+    data_point points[LINK_USAGE_MAX_PLOT / LINK_USAGE_PLOT_INTERVAL + 1][1] = {};
+    char *link_loads_x_labels[LINK_USAGE_MAX_PLOT / LINK_USAGE_PLOT_INTERVAL + 1];
+    uint64_t index = 0;
+    for (uint64_t i = 0; i < LINK_USAGE_MAX_PLOT; i += LINK_USAGE_PLOT_INTERVAL)
+    {
+        link_loads_x_labels[index] = calloc(16, sizeof(char));
+        points[index][0].x = link_loads_x_labels[index];
+        snprintf(link_loads_x_labels[index], 16, "%ld-%ld", i, i + LINK_USAGE_PLOT_INTERVAL);
+        index++;
+    }
+    char *legends[] = {"Load Range"};
+    bar_plot p = {.width = BAR_PLOT_WIDTH, .samples_count = 1, .legends = legends, .y_label = "Frequency", .data_points = (data_point *)points, .x_labels_count = (LINK_USAGE_MAX_PLOT / LINK_USAGE_PLOT_INTERVAL), .x_labels = link_loads_x_labels};
+    uint64_t link_usages[LINK_USAGE_MAX_PLOT / LINK_USAGE_PLOT_INTERVAL + 1];
+    for (uint64_t link_index = 0; link_index < topology_node_count * topology_node_count; link_index++)
+    {
+        uint64_t index = 0;
+        if (total_link_loads[link_index] > 0)
+        {
+            for (uint64_t i = 0; i < LINK_USAGE_MAX_PLOT; i += LINK_USAGE_PLOT_INTERVAL)
+            {
+                if (total_link_loads[link_index] < i)
+                {
+                    points[index - 1][0].y++;
+                    link_usages[index - 1]++;
+                    if (index > p.data_points_count)
+                        p.data_points_count = index + (index == (LINK_USAGE_MAX_PLOT / LINK_USAGE_PLOT_INTERVAL) ? 0 : 1);
+                    break;
+                }
+                index++;
+            }
+        }
+    }
+    print_plot(p, f);
+    index = 0;
+    for (uint64_t i = 0; i < LINK_USAGE_MAX_PLOT; i += LINK_USAGE_PLOT_INTERVAL)
+    {
+        free(link_loads_x_labels[index++]);
+    }
+}
+
+void print_path_lengths(uint64_t topology_node_count, assignment_t *assignments, uint64_t request_count, FILE *f)
+{
+    data_point points[PATH_LENGTH_MAX_PLOT / PATH_LENGTH_PLOT_INTERVAL + 1][1] = {};
+    char *link_loads_x_labels[PATH_LENGTH_MAX_PLOT / PATH_LENGTH_PLOT_INTERVAL + 1];
+    uint64_t index = 0;
+    for (uint64_t i = 0; i < PATH_LENGTH_MAX_PLOT; i += PATH_LENGTH_PLOT_INTERVAL)
+    {
+        link_loads_x_labels[index] = calloc(16, sizeof(char));
+        points[index][0].x = link_loads_x_labels[index];
+        snprintf(link_loads_x_labels[index], 16, "%ld-%ld", i, i + PATH_LENGTH_PLOT_INTERVAL);
+        index++;
+    }
+    char *legends[] = {"Length Range"};
+    bar_plot p = {.width = BAR_PLOT_WIDTH, .samples_count = 1, .legends = legends, .y_label = "Frequency", .data_points = (data_point *)points, .x_labels_count = (PATH_LENGTH_MAX_PLOT / PATH_LENGTH_PLOT_INTERVAL), .x_labels = link_loads_x_labels};
+    uint64_t link_usages[PATH_LENGTH_MAX_PLOT / PATH_LENGTH_PLOT_INTERVAL + 1];
+    for (uint64_t assignment_index = 0; assignment_index < request_count; assignment_index++)
+    {
+        uint64_t index = 0;
+        if (assignments[assignment_index].path->length > 0)
+        {
+            for (uint64_t i = 0; i < PATH_LENGTH_MAX_PLOT; i += PATH_LENGTH_PLOT_INTERVAL)
+            {
+                if (assignments[assignment_index].path->distance < i)
+                {
+                    points[index - 1][0].y++;
+                    link_usages[index - 1]++;
+                    if (index > p.data_points_count)
+                        p.data_points_count = index + (index == (PATH_LENGTH_MAX_PLOT / PATH_LENGTH_PLOT_INTERVAL) ? 0 : 1);
+                    break;
+                }
+                index++;
+            }
+        }
+    }
+    print_plot(p, f);
+    index = 0;
+    for (uint64_t i = 0; i < PATH_LENGTH_MAX_PLOT; i += PATH_LENGTH_PLOT_INTERVAL)
+    {
+        free(link_loads_x_labels[index++]);
+    }
+}
+
+typedef struct read_entropy_data_t
+{
+    char buffer[256];
+    const network_t *network;
+    const dynamic_char_array *used_frequency_slots;
+    double (*entropy_calculator)(const dynamic_char_array *);
+} read_entropy_data_t;
+
+char *read_entropy(const void *data, uint64_t from, uint64_t to)
+{
+    read_entropy_data_t *_data = (read_entropy_data_t *)data;
+    snprintf(_data->buffer, sizeof(_data->buffer), "%.3f", _data->entropy_calculator(_data->used_frequency_slots + from * _data->network->node_count + to));
+    return _data->buffer;
+}
+
+void print_entropy(const network_t *network, coordinate *coordinates, uint64_t topology_node_count, FILE *f, dynamic_char_array *used_frequency_slots)
+{
+    read_entropy_data_t data = {.used_frequency_slots = used_frequency_slots, .network = network, .entropy_calculator = utilization_entropy};
+    print_graph(network, read_entropy, &data, coordinates, NULL, 0, 2.0, 1.5, f, DRAW_ARROWS);
+    fprintf(f, "\n");
+    print_graph(network, read_entropy, &data, coordinates, NULL, 0, 2.0, 1.5, f, DRAW_ARROWS | REVERSE_ARROWS);
+    data_point points[ENTROPY_PLOT_INTERVALS_COUNT][1] = {};
+    char *link_loads_x_labels[ENTROPY_PLOT_INTERVALS_COUNT];
+    uint64_t index = 0;
+    for (double i = 0; i < ENTROPY_MAX_PLOT; i += ENTROPY_PLOT_INTERVAL)
+    {
+        link_loads_x_labels[index] = calloc(16, sizeof(char));
+        points[index][0].x = link_loads_x_labels[index];
+        snprintf(link_loads_x_labels[index], 16, "%.2f-%.2f", i, i + ENTROPY_PLOT_INTERVAL);
+        index++;
+    }
+    char *legends[] = {"Entropy Range"};
+    bar_plot p = {.width = BIG_BAR_PLOT_WIDTH, .samples_count = 1, .legends = legends, .y_label = "Frequency", .data_points = (data_point *)points, .x_labels_count = (ENTROPY_PLOT_INTERVALS_COUNT), .x_labels = link_loads_x_labels};
+    uint64_t link_usages[ENTROPY_PLOT_INTERVALS_COUNT];
+    for (uint64_t from = 0; from < topology_node_count; from++)
+    {
+        for (uint64_t to = 0; to < topology_node_count; to++)
+        {
+            uint64_t index = 0;
+            if (get_link_weight(network, from, to) != -1)
+            {
+                double entropy = utilization_entropy(used_frequency_slots + from * topology_node_count + to);
+
+                for (double i = 0; i < ENTROPY_MAX_PLOT; i += ENTROPY_PLOT_INTERVAL)
+                {
+                    if (entropy < i)
+                    {
+                        points[index - 1][0].y++;
+                        link_usages[index - 1]++;
+                        if (index > p.data_points_count)
+                            p.data_points_count = index + (index == (ENTROPY_PLOT_INTERVALS_COUNT) ? 0 : 1);
+                        break;
+                    }
+                    index++;
+                }
+            }
+        }
+    }
+    print_plot(p, f);
+    for (uint64_t i = 0; i < ENTROPY_PLOT_INTERVALS_COUNT; i++)
+    {
+        free(link_loads_x_labels[i]);
+    }
+}
+
+void print_shannon_entropy(const network_t *network, coordinate *coordinates, uint64_t topology_node_count, FILE *f, dynamic_char_array *used_frequency_slots)
+{
+    read_entropy_data_t data = {.used_frequency_slots = used_frequency_slots, .network = network, .entropy_calculator = shannon_entropy};
+    print_graph(network, read_entropy, &data, coordinates, NULL, 0, 2.0, 1.5, f, DRAW_ARROWS);
+    fprintf(f, "\n");
+    print_graph(network, read_entropy, &data, coordinates, NULL, 0, 2.0, 1.5, f, DRAW_ARROWS | REVERSE_ARROWS);
+    data_point points[SHANNON_ENTROPY_PLOT_INTERVALS_COUNT][1] = {};
+    char *link_loads_x_labels[SHANNON_ENTROPY_PLOT_INTERVALS_COUNT];
+    uint64_t index = 0;
+    for (double i = 0; i < ENTROPY_MAX_PLOT; i += SHANNON_ENTROPY_PLOT_INTERVAL)
+    {
+        link_loads_x_labels[index] = calloc(16, sizeof(char));
+        points[index][0].x = link_loads_x_labels[index];
+        snprintf(link_loads_x_labels[index], 16, "%.3f-%.3f", i, i + SHANNON_ENTROPY_PLOT_INTERVAL);
+        index++;
+    }
+    char *legends[] = {"Entropy Range"};
+    bar_plot p = {.width = BIG_BAR_PLOT_WIDTH, .samples_count = 1, .legends = legends, .y_label = "Frequency", .data_points = (data_point *)points, .x_labels_count = (SHANNON_ENTROPY_PLOT_INTERVALS_COUNT), .x_labels = link_loads_x_labels};
+    uint64_t link_usages[SHANNON_ENTROPY_PLOT_INTERVALS_COUNT];
+    for (uint64_t from = 0; from < topology_node_count; from++)
+    {
+        for (uint64_t to = 0; to < topology_node_count; to++)
+        {
+            uint64_t index = 0;
+            if (get_link_weight(network, from, to) != -1)
+            {
+                double entropy = shannon_entropy(used_frequency_slots + from * topology_node_count + to);
+
+                for (double i = 0; i < ENTROPY_MAX_PLOT; i += SHANNON_ENTROPY_PLOT_INTERVAL)
+                {
+                    if (entropy < i)
+                    {
+                        points[index - 1][0].y++;
+                        link_usages[index - 1]++;
+                        if (index > p.data_points_count)
+                            p.data_points_count = index + (index == (SHANNON_ENTROPY_PLOT_INTERVALS_COUNT) ? 0 : 1);
+                        break;
+                    }
+                    index++;
+                }
+            }
+        }
+    }
+    print_plot(p, f);
+    for (uint64_t i = 0; i < SHANNON_ENTROPY_PLOT_INTERVALS_COUNT; i++)
+    {
+        free(link_loads_x_labels[i]);
+    }
+}
+
+void print_report(const network_t *network, assignment_t *assignments, uint64_t requests_count, assignment_t *protections, dynamic_char_array *used_frequency_slots, uint64_t *total_link_loads, char *title, FILE *f, coordinate *coordinates, protection_type protection)
+{
+    print_prologue(f, title);
+
+    print_section(f, "Topology");
+    read_link_weight_data_t data = {.network = network};
+    print_graph(network, read_link_weight, &data, coordinates, NULL, 0, 1.5, 1.0, f, 0);
+
     uint64_t topology_node_count = network->node_count;
-    fprintf(file, COLOR_BOLD_BLUE "\nRMSAs\n" COLOR_OFF);
-    for (uint64_t i = 0; i < requests_count; i++)
-    {
-        print_assignment(assignments[i], file);
-        fprintf(file, "\n");
-    }
-
-    fprintf(file, COLOR_BOLD_BLUE "\nProtection RMSAs\n" COLOR_OFF);
-    for (uint64_t i = 0; i < requests_count; i++)
-    {
-        print_assignment(protections[i], file);
-        fprintf(file, "\n");
-    }
-
-    fprintf(file, COLOR_BOLD_BLUE "\nPERFORMANCE PARAMENTERS\n" COLOR_OFF);
-    __ssize_t highest_fsu = -1;
-    for (uint64_t i = 0; i < requests_count; i++)
-    {
-        __ssize_t slot = highest_fsu_in_assignent(assignments + i);
-        if (slot > highest_fsu)
-            highest_fsu = slot;
-    }
-    fprintf(file, COLOR_BOLD_BLUE "Highest used fsu: %ld\n" COLOR_OFF, highest_fsu);
 
     __ssize_t highest_loaded_link = -1;
     for (uint64_t i = 0; i < topology_node_count * topology_node_count; i++)
@@ -210,85 +406,72 @@ void print_report(const network_t *network, assignment_t *assignments, uint64_t 
         if (total_link_loads[i] > highest_loaded_link || highest_loaded_link == -1)
             highest_loaded_link = total_link_loads[i];
     }
-    fprintf(file, COLOR_BOLD_BLUE "Highest link load: %ld\n" COLOR_OFF, highest_loaded_link);
-
-    fprintf(file, "Link usage distribution:\n");
-    for (uint64_t i = 0; i < topology_node_count; i++)
-    {
-        for (uint64_t j = 0; j < topology_node_count; j++)
-        {
-            if (get_link_weight(network, i, j) > 0)
-                fprintf(file, "%ld\t", total_link_loads[i * topology_node_count + j]);
-            else
-                fprintf(file, "■\t");
-        }
-        fprintf(file, "\n");
-    }
-    fprintf(file, "\n");
-
-    fprintf(file, COLOR_BOLD_BLUE "Utilization entropies [thousandths]:\n" COLOR_OFF);
-    for (uint64_t i = 0; i < topology_node_count; i++)
-    {
-        for (uint64_t j = 0; j < topology_node_count; j++)
-        {
-            if (get_link_weight(network, i, j) != -1)
-            {
-                fprintf(file, "%.2f\t", utilization_entropy(used_frequency_slots + i * topology_node_count + j) * 1000);
-            }
-            else
-            {
-                printf("\t");
-            }
-        }
-        fprintf(file, "\n");
-    }
-    fprintf(file, "\n");
-
-    fprintf(file, COLOR_BOLD_BLUE "Shannon entropies:\n" COLOR_OFF);
-    for (uint64_t i = 0; i < topology_node_count; i++)
-    {
-        for (uint64_t j = 0; j < topology_node_count; j++)
-        {
-            if (get_link_weight(network, i, j) != -1)
-            {
-                fprintf(file, "%.2f\t", shannon_entropy(used_frequency_slots + i * topology_node_count + j));
-            }
-            else
-            {
-                printf("\t");
-            }
-        }
-        fprintf(file, "\n");
-    }
-    fprintf(file, "\n");
-
-    fprintf(file, "\n");
-
-    fprintf(file, "\nEND\n");
-
-    mkdir("./reports", S_IRWXU | S_IRWXG | S_IROTH);
-    FILE *f = fopen("reports/out.tex", "w+");
-    print_prologue(f, title);
-    print_section(f, "Topology");
-    coordinate c[] = {{.x = 2.0, .y = 4.0}, {.x = 3.5, .y = 4.0}, {.x = 0.5, .y = 4.0}, {.x = 5.0, .y = 4.0}, {.x = 0.0, .y = 2.0}, {.x = 0.5, .y = 0.0}, {.x = 2.0, .y = 2.0}, {.x = 4.0, .y = 2.0}, {.x = 2.8, .y = 0.0}, {.x = 4.0, .y = 0.0}};
-    read_link_weight_data_t data = {.network = network};
-    print_graph(network, read_link_weight, &data, c, NULL, 0, 1.5, 1.0, f);
-    data_point points[1][4] = {{{.x = "a", .y = 10}, {.x = "b", .y = 20}, {.x = "c", .y = 22}, {.x = "d", .y = 11}}};
-    char *x_labels[] = {"a", "b", "c", "d"};
-    char *legends[] = {"Range"};
-    bar_plot p = {.data_points_count = 4, .samples_count = 1, .legends = legends, .y_label = "Frequency", .data_points = (data_point *)points, .x_labels_count = 4, .x_labels = x_labels};
-    print_section(f, "Entropy");
-    print_plot(p, f);
-
-    print_section(f, "Assignments");
+    __ssize_t highest_fsu = -1;
     for (uint64_t i = 0; i < requests_count; i++)
     {
-        print_assignment_latex(network, assignments + i, c, protections + i, f);
+        __ssize_t slot = highest_fsu_in_assignent(assignments + i);
+        if (slot > highest_fsu)
+            highest_fsu = slot;
+    }
+    uint64_t total_fsus = 0;
+    for (uint64_t i = 0; i < requests_count; i++)
+    {
+        total_fsus += assignments[i].end_slot - assignments[i].start_slot;
+    }
+    uint64_t format_frequencies[MODULATION_FORMATS_DIM] = {};
+    uint64_t transponder_cost = 0;
+    for (uint64_t i = 0; i < requests_count; i++)
+    {
+        assignment_t *aux = assignments + i;
+        do
+        {
+            format_frequencies[aux->format]++;
+            transponder_cost += formats[aux->format].cost;
+            if (aux->is_split)
+                aux = aux->split;
+            else
+                aux = NULL;
+        } while (aux != NULL);
+    }
+
+    print_section(f, "Performance Parameters");
+    fprintf(f, "Highest link load: %ld\\\\\n", highest_loaded_link);
+    fprintf(f, "Highest used fsu: %ld out of %d\\\\\n", highest_fsu, MAX_SPECTRAL_SLOTS);
+    fprintf(f, "Total used fsus: %ld\\\\\n", total_fsus);
+    fprintf(f, "Modulation format use counts: {");
+    for (uint64_t i = 0; i < MODULATION_FORMATS_DIM; i++)
+    {
+        fprintf(f, "%ld", format_frequencies[i]);
+        if (i != MODULATION_FORMATS_DIM - 1)
+        {
+            fprintf(f, ", ");
+        }
+    }
+    fprintf(f, "}\\\\\n");
+    fprintf(f, "Transponder costs: %ld\n", transponder_cost);
+    print_section(f, "Link Load Distribution");
+    print_link_usage(topology_node_count, total_link_loads, f);
+    print_section(f, "Path Length Distribution");
+    print_path_lengths(topology_node_count, assignments, requests_count, f);
+    if (protection == DEDICATED_PROTECTION)
+    {
+        print_section(f, "Protection Path Length Distribution");
+        print_path_lengths(topology_node_count, protections, requests_count, f);
+    }
+    print_section(f, "Utilization Entropy");
+    print_entropy(network, coordinates, topology_node_count, f, used_frequency_slots);
+    print_section(f, "Shannon Entropy");
+    print_shannon_entropy(network, coordinates, topology_node_count, f, used_frequency_slots);
+
+        print_section(f, "Assignments");
+    for (uint64_t i = 0; i < requests_count; i++)
+    {
+        print_assignment_latex(network, assignments + i, coordinates, protections + i, f);
         if ((i % 3) == 2 && i != requests_count - 1)
             print_linebreak(f);
     }
+
     print_epilogue(f);
-    fclose(f);
 
     for (uint64_t i = 0; i < requests_count; i++)
     {
@@ -303,12 +486,7 @@ void print_report(const network_t *network, assignment_t *assignments, uint64_t 
     }
 }
 
-void run_comparison(const network_t *network, const uint64_t *connection_requests, int ascending, FILE *file, routing_algorithms *routing_a, slot_assignment_algorithms *slot_a, modulation_format_assignment_algorithms *modulation_a)
-{
-    protection_type protection = NO_PROTECTION;
-}
-
-void run_requests(const network_t *network, const uint64_t *connection_requests, int ascending, char *title, FILE *file, protection_type protection, routing_algorithms routing_a, slot_assignment_algorithms slot_a, modulation_format_assignment_algorithms modulation_a)
+void run_requests(const network_t *network, const uint64_t *connection_requests, int ascending, char *title, FILE *file, coordinate *coordinates, protection_type protection, routing_algorithms routing_a, slot_assignment_algorithms slot_a, modulation_format_assignment_algorithms modulation_a)
 {
     uint64_t topology_node_count = network->node_count;
     connection_request *requests = calloc(topology_node_count * topology_node_count, sizeof(connection_request));
@@ -348,7 +526,7 @@ void run_requests(const network_t *network, const uint64_t *connection_requests,
     }
     free(requests);
 
-    print_report(network, assignments, requests_count, protections, used_frequency_slots, total_link_loads, title, file);
+    print_report(network, assignments, requests_count, protections, used_frequency_slots, total_link_loads, title, file, coordinates, protection);
 
     free(total_link_loads);
     free(assignments);
@@ -381,6 +559,7 @@ network_t *build_network(uint64_t topology_node_count, uint64_t links[][3], uint
 
 void run_solutions()
 {
+    mkdir("./reports", S_IRWXU | S_IRWXG | S_IROTH);
     network_t *german_n = build_network(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE);
     // run_requests(german_n, (uint64_t *)g7_1, 0, stdout,SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
     // run_requests(german_n, (uint64_t *)g7_1, 1, stdout,SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
@@ -403,32 +582,14 @@ void run_solutions()
     // run_requests(italian_n, (uint64_t *)IT10_4, 0, stdout, SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
     // run_requests(italian_n, (uint64_t *)IT10_4, 1, stdout, SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
     // run_requests(italian_n, (uint64_t *)IT10_5, 0, stdout, SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
-    run_requests(italian_n, (uint64_t *)IT10_5, 1, "Italian - Shared Protection - Custom Algorithm", stdout, SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    FILE *f = fopen("reports/out.tex", "w+");
+    run_requests(italian_n, (uint64_t *)IT10_5, 1, "Italian - Shared Protection - Custom Algorithm", f, italian_coordinates, SHARED_PROTECTION, LEAST_USED_PATH_JOINT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    fclose(f);
     free_network(italian_n);
 }
 
 int main(void)
 {
-    // run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_1, 0, stdout);
-    // run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_1, 1, stdout);
-    // run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_2, 0, stdout);
-    // run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_2, 1, stdout);
-    // run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_3, 0, stdout);
-    // run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_3, 1, stdout);
-    // run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_4, 0, stdout);
-    // run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_4, 1, stdout);
-    // run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_5, 0, stdout);
-    // run_solution(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE, (uint64_t *)g7_5, 1, stdout);
-    //
-    // run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_1, 0, stdout);
-    // run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_1, 1, stdout);
-    // run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_2, 0, stdout);
-    // run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_2, 1, stdout);
-    // run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_3, 0, stdout);
-    // run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_3, 1, stdout);
-    // run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_4, 0, stdout);
-    // run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_4, 1, stdout);
-    // run_solution(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE, (uint64_t *)IT10_5, 0, stdout);
     run_solutions();
     return 0;
 }

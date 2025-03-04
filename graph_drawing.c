@@ -1,7 +1,7 @@
 #include "graph_drawing.h"
 #include <stdlib.h>
 
-void print_graph(const network_t *network, label_generator labeler, void *data, const coordinate *node_coordinates, path_drawing *paths, uint64_t paths_size, double x_scale, double y_scale, FILE *file)
+void print_graph(const network_t *network, label_generator labeler, void *data, const coordinate *node_coordinates, path_drawing *paths, uint64_t paths_size, double x_scale, double y_scale, FILE *file, print_graph_options options)
 {
     fprintf(file, "\\begin{tikzpicture}[node distance=2cm,>=stealth',auto, every place/.style={draw}, baseline]\n");
     for (uint64_t i = 0; i < network->node_count; i++)
@@ -15,12 +15,12 @@ void print_graph(const network_t *network, label_generator labeler, void *data, 
     {
         for (uint64_t j = 0; j < network->node_count; j++)
         {
-            if (i >= j)
+            if ((i >= j && !(options & REVERSE_ARROWS)) || (i <= j && (options & REVERSE_ARROWS)))
                 continue;
             __ssize_t link_weight = get_link_weight(network, i, j);
             if (link_weight != -1)
             {
-                fprintf(file, "\\path[] (S%ld) edge node {%s} (S%ld);\n", i + 1, labeler(data, i, j), j + 1);
+                fprintf(file, "\\path[%s] (S%ld) edge node {%s} (S%ld);\n", options & DRAW_ARROWS ? "->" : "", i + 1, labeler(data, i, j), j + 1);
             }
         }
     }
@@ -59,8 +59,11 @@ void print_plot(bar_plot plot, FILE *file)
 \n  minor tick num=1,\
 \n  major tick style={draw=none},\
 \n  enlarge x limits=0.125,\
+\n  xtick=data,\
+\n  width=%.3fcm,\
+\n  bar width=%.3fmm,\
 \n  symbolic x coords={",
-            plot.y_label);
+            plot.y_label, plot.width, plot.width / plot.data_points_count * 10 - 5);
     for (uint64_t i = 0; i < plot.x_labels_count; i++)
     {
         fprintf(file, "%s", plot.x_labels[i]);
