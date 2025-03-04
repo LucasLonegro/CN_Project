@@ -54,12 +54,17 @@ void set_slot_usages(const path_t *path, uint64_t start_slot, uint64_t end_slot,
     }
 }
 
+uint64_t calculate_slot_requirement(assignment_t *assignment, const modulation_format *formats, uint64_t n)
+{
+    return ((uint64_t)(formats[assignment->format].channel_bandwidth / FSU_BANDWIDTH + 0.5)) + (assignment->is_split ? calculate_slot_requirement(assignment->split, formats, n + 1) : 0);
+}
+
 __ssize_t first_fit_slot_assignment(const network_t *network, const modulation_format *formats, assignment_t *assignment_ret, dynamic_char_array *link_slot_usages_ret, protection_type protection)
 {
     dynamic_char_array *available_slots = new_dynamic_char_array();
     accumulate_slots(network, assignment_ret->path, link_slot_usages_ret, available_slots);
 
-    uint64_t slot_requirement = (uint64_t)(formats[assignment_ret->format].channel_bandwidth / FSU_BANDWIDTH + 0.5);
+    uint64_t slot_requirement = calculate_slot_requirement(assignment_ret, formats, 0);
     uint64_t consecutive_slots = 0;
     for (uint64_t i = 0; i < MAX_SPECTRAL_SLOTS; i++)
     {
@@ -99,7 +104,7 @@ __ssize_t least_used_slot_assignment(const network_t *network, const modulation_
     accumulate_slots(network, assignment_ret->path, link_slot_usages_ret, available_slots);
 
     __ssize_t least_used_usage = -1, least_used_start_slot = -1;
-    uint64_t slot_requirement = (uint64_t)(formats[assignment_ret->format].channel_bandwidth / FSU_BANDWIDTH + 0.5);
+    uint64_t slot_requirement = calculate_slot_requirement(assignment_ret, formats, 0);
     uint64_t consecutive_slots = 0;
     for (uint64_t i = 0; i < MAX_SPECTRAL_SLOTS; i++)
     {
@@ -256,7 +261,7 @@ void run_modulator(const network_t *network, connection_request *requests, uint6
 
             if (leftover_load == -1)
             {
-                printf("\n\nFAILED TO ASSIGN A MODULATION FORMAT\n\n");
+                return;
             }
 
             if (leftover_load)
@@ -290,13 +295,14 @@ void run_LUS_slotting_internal(const network_t *network, const modulation_format
         assignment_t *assignment = assignments_ret + request_index;
         if (assignment == NULL || assignment->path == NULL || assignment->path->distance == -1)
             continue;
+        least_used_slot_assignment(network, formats, assignment, link_slot_usages_ret, usages, protection);
         while (assignment != NULL)
         {
 
-            least_used_slot_assignment(network, formats, assignment, link_slot_usages_ret, usages, protection);
-
             if (assignment->is_split)
             {
+                assignment->split->start_slot = assignment->start_slot;
+                assignment->split->end_slot = assignment->end_slot;
                 assignment = assignment->split;
             }
             else
@@ -331,13 +337,14 @@ void run_FFS_slotting_internal(const network_t *network, const modulation_format
         assignment_t *assignment = assignments_ret + request_index;
         if (assignment == NULL || assignment->path == NULL || assignment->path->distance == -1)
             continue;
+        first_fit_slot_assignment(network, formats, assignment, link_slot_usages_ret, protection);
         while (assignment != NULL)
         {
 
-            first_fit_slot_assignment(network, formats, assignment, link_slot_usages_ret, protection);
-
             if (assignment->is_split)
             {
+                assignment->split->start_slot = assignment->start_slot;
+                assignment->split->end_slot = assignment->end_slot;
                 assignment = assignment->split;
             }
             else
@@ -366,10 +373,6 @@ path_t **run_SPF_routing(const network_t *network, connection_request *requests,
         assignment_t *assignment = assignments_ret + request_index;
         path_t *assigned_path = find_shortest_path(network, request.from_node_id, request.to_node_id); // Split loads over a single path
         assignment->path = assigned_path;
-        if (assigned_path->length == -1)
-        {
-            printf("\n\nFAILED TO ASSIGN A PATH\n\n");
-        }
     }
     return NULL;
 }
@@ -384,11 +387,7 @@ path_t **run_LML_routing(const network_t *network, connection_request *requests,
         assignment_t *assignment = assignments_ret + request_index;
         path_t *assigned_path = find_least_maximally_loaded_path_modified(network, request.from_node_id, request.to_node_id, loads); // Split loads over a single path
         assignment->path = assigned_path;
-        if (assigned_path->length == -1)
-        {
-            printf("\n\nFAILED TO ASSIGN A PATH\n\n");
-        }
-        else
+        if (assigned_path->length != -1)
         {
             for (uint64_t i = 0; i < assignment->path->length; i++)
             {
@@ -435,7 +434,6 @@ void change_path(const network_t *network, assignment_t *assignment, uint64_t *l
     }
 
     assignment->path = new_path;
-    // print_path(assignment->path, stdout);
     for (uint64_t i = 0; i < assignment->path->length; i++)
     {
         loads[assignment->path->nodes[i] * network->node_count + assignment->path->nodes[i + 1]] += path_load;
@@ -451,14 +449,33 @@ uint64_t assignment_load(const assignment_t *assignment)
     return assignment->load;
 }
 
-// obviously, don't consider source and sink nodes
-int is_node_disjoint(const network_t *network, uint64_t from, uint64_t to, const void *data)
+int is_link_disjoint(const network_t *network, uint64_t from, uint64_t to, const void *data)
 {
     const path_t *_data = (const path_t *)(data);
+    if (_data->length == -1)
+        return 1;
     for (uint64_t i = 0; i < _data->length; i++)
     {
-        if (to == _data->nodes[i])
+        if (from == _data->nodes[i] && to == _data->nodes[i + 1])
             return 0;
+    }
+    return 1;
+}
+
+// obviously, don't consider source and sink nodes
+int is_node_disjoint_ignore_sink_source(const network_t *network, uint64_t from, uint64_t to, const void *data)
+{
+    const path_t *_data = (const path_t *)(data);
+    if (_data->length == 1 && from == _data->nodes[0] && to == _data->nodes[1])
+        return 0;
+    if (_data->length == -1)
+        return 1;
+    for (uint64_t i = 1; i < _data->length; i++)
+    {
+        if (to == _data->nodes[i])
+        {
+            return 0;
+        }
     }
     return 1;
 }
@@ -470,7 +487,7 @@ dynamic_word_array *build_node_users(const network_t *network, const assignment_
     {
         if (assignments[i].path->distance != -1)
         {
-            for (uint64_t j = 1; j < assignments[i].path->length; j++)
+            for (uint64_t j = 0; j <= assignments[i].path->length; j++)
             {
                 set_value(node_users + assignments[i].path->nodes[j], node_users[assignments[i].path->nodes[j]].size, i);
             }
@@ -487,7 +504,7 @@ int add_elem(uint64_t *arr, uint64_t dim, uint64_t elem)
             return 0;
     }
     arr[dim] = elem;
-    return 0;
+    return 1;
 }
 
 typedef struct conflict_data
@@ -502,8 +519,10 @@ int do_not_conflict(const network_t *network, uint64_t from, uint64_t to, const 
     conflict_data *_data = (conflict_data *)data;
     for (uint64_t i = 0; i < _data->conflicts_dim; i++)
     {
-        if (!is_node_disjoint(network, from, to, (void *)_data->protection_paths[_data->conflicts[i]].path))
+        if ((_data->protection_paths[_data->conflicts[i]].path->length <= 1 && !is_link_disjoint(network, from, to, (void *)_data->protection_paths[_data->conflicts[i]].path)) || (_data->protection_paths[_data->conflicts[i]].path->length > 1 && !is_node_disjoint_ignore_sink_source(network, from, to, (void *)_data->protection_paths[_data->conflicts[i]].path)))
+        {
             return 0;
+        }
     }
     return 1;
 }
@@ -526,27 +545,41 @@ path_t **run_LML_routing_modified_internal(const network_t *network, connection_
 
         assignment_t *assignment = to_assign + request_index;
         path_t *assigned_path;
-        conflict_data data = {.conflicts = conflicts, .protection_paths = protections};
         if (protection == DEDICATED_PROTECTION)
         {
-            assigned_path = find_least_maximally_loaded_path_modified_validators(network, request.from_node_id, request.to_node_id, loads, is_node_disjoint, (void *)assignments_ret[request_index].path);
+            assigned_path = find_least_maximally_loaded_path_modified_validators(network, request.from_node_id, request.to_node_id, loads, is_node_disjoint_ignore_sink_source, (void *)assignments_ret[request_index].path);
             to_ret[to_ret_index++] = assigned_path;
         }
         else if (protection == SHARED_PROTECTION)
         {
+            conflict_data data = {.conflicts = conflicts, .protection_paths = protections};
             conflicts_count = 0;
-            for (uint64_t i = 0; i <= assignments_ret[request_index].path->length; i++)
+            for (uint64_t i = 1; i < assignments_ret[request_index].path->length; i++)
             {
                 for (uint64_t j = 0; j < node_users[assignments_ret[request_index].path->nodes[i]].size; j++)
                 {
-                    uint64_t conflict_index = get_value(node_users, assignments_ret[request_index].path->nodes[i]);
-                    if (conflict_index > request_index)
+                    uint64_t conflict_index = get_value(node_users + assignments_ret[request_index].path->nodes[i], j);
+                    if (conflict_index < request_index && assignments_ret[conflict_index].path->length != 1)
                         conflicts_count += add_elem(conflicts, conflicts_count, conflict_index);
+                }
+            }
+            if (assignments_ret[request_index].path->length == 1)
+            {
+                for (uint64_t j = 0; j < node_users[assignments_ret[request_index].path->nodes[0]].size; j++)
+                {
+                    uint64_t conflict_index_1 = get_value(node_users + assignments_ret[request_index].path->nodes[0], j);
+                    if (conflict_index_1 < request_index && assignments_ret[conflict_index_1].path->length != 1)
+                    {
+                        if (!is_link_disjoint(network, assignments_ret[request_index].path->nodes[0], assignments_ret[request_index].path->nodes[1], assignments_ret[conflict_index_1].path))
+                        {
+                            conflicts_count += add_elem(conflicts, conflicts_count, conflict_index_1);
+                        }
+                    }
                 }
             }
             link_validator_list validator_join;
             data.conflicts_dim = conflicts_count;
-            link_validator_list_entry entries[] = {{.validator = is_node_disjoint, .data = (void *)assignments_ret[request_index].path}, {.validator = do_not_conflict, .data = (void *)&data}};
+            link_validator_list_entry entries[] = {{.validator = is_node_disjoint_ignore_sink_source, .data = (void *)assignments_ret[request_index].path}, {.validator = do_not_conflict, .data = (void *)&data}};
             validator_join.len = 2;
             validator_join.entries = entries;
             assigned_path = find_least_maximally_loaded_path_modified_validators(network, request.from_node_id, request.to_node_id, loads, validator_joiner, (void *)&validator_join);
@@ -557,11 +590,7 @@ path_t **run_LML_routing_modified_internal(const network_t *network, connection_
             assigned_path = find_least_maximally_loaded_path_modified(network, request.from_node_id, request.to_node_id, loads);
         }
         assignment->path = assigned_path;
-        if (assigned_path->length == -1)
-        {
-            printf("\n\nFAILED TO ASSIGN A PATH\n\n");
-        }
-        else
+        if (assigned_path->length != -1)
         {
             for (uint64_t i = 0; i < assignment->path->length; i++)
             {
