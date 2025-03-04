@@ -49,10 +49,11 @@ void print_plot(bar_plot plot, FILE *file)
             "\n\\begin{tikzpicture}\
 \n\\begin{axis}[\
 \n	x tick label style={\
+\n      rotate=90,\
 \n		/pgf/number format/1000 sep=},\
 \n	ylabel=%s,\
 \n	enlargelimits=0.05,\
-\n	legend style={at={(0.5,-0.1)},\
+\n	legend style={at={(0.5,-0.2)},\
 \n	anchor=north,legend columns=-1},\
 \n	ybar=0.7,\
 \n  xminorgrids=true,\
@@ -103,7 +104,7 @@ void print_plot(bar_plot plot, FILE *file)
 
 void print_section(FILE *file, char *section)
 {
-    fprintf(file, "\n\\section*{%s}", section);
+    fprintf(file, "\\pagebreak\n\\section*{%s}", section);
 }
 
 void print_prologue(FILE *file, char *title)

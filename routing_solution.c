@@ -12,7 +12,7 @@ path_t *find_shortest_path(const network_t *network, uint64_t from_node_id, uint
     return assigned_path;
 }
 
-path_t *find_shortest_path_wrapper(const network_t *network, uint64_t from_node_id, uint64_t to_node_id, uint64_t *)
+path_t *find_shortest_path_wrapper(const network_t *network, uint64_t from_node_id, uint64_t to_node_id, uint64_t *noop)
 {
     return find_shortest_path(network, from_node_id, to_node_id);
 }

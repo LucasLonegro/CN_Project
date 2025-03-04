@@ -17,6 +17,7 @@ typedef struct modulation_format
     double channel_bandwidth;
     uint64_t maximum_length;
     double cost;
+    char *name;
 } modulation_format;
 
 extern modulation_format formats[MODULATION_FORMATS_DIM];
