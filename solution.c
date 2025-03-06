@@ -497,12 +497,45 @@ void run_requests(const network_t *network, const uint64_t *connection_requests,
     uint64_t *total_link_loads = calloc(topology_node_count * topology_node_count, sizeof(uint64_t));
     for (uint64_t i = 0; i < requests_count; i++)
     {
-        assignment_t assignment = assignments[i];
-        for (uint64_t node = 0; node < assignment.path->length; node++)
+        assignment_t *assignment = assignments + i;
+        do
         {
-            if (assignment.path->length == -1)
-                break;
-            total_link_loads[assignment.path->nodes[node] * topology_node_count + assignment.path->nodes[node + 1]] += assignment.load;
+            for (uint64_t node = 0; node < assignment->path->length; node++)
+            {
+                if (assignment->path->length == -1)
+                    break;
+                total_link_loads[assignment->path->nodes[node] * topology_node_count + assignment->path->nodes[node + 1]] += assignment->load;
+            }
+            if (assignment->is_split)
+            {
+                assignment = assignment->split;
+            }
+            else
+                assignment = NULL;
+        } while (assignment != NULL);
+    }
+    if (protection == DEDICATED_PROTECTION)
+    {
+        for (uint64_t i = 0; i < requests_count; i++)
+        {
+            assignment_t *assignment = protections + i;
+            if (assignment == NULL || assignment->path == NULL || assignment->path->length == -1)
+                continue;
+            do
+            {
+                for (uint64_t node = 0; node < assignment->path->length; node++)
+                {
+                    if (assignment->path->length == -1)
+                        break;
+                    total_link_loads[assignment->path->nodes[node] * topology_node_count + assignment->path->nodes[node + 1]] += assignment->load;
+                }
+                if (assignment->is_split)
+                {
+                    assignment = assignment->split;
+                }
+                else
+                    assignment = NULL;
+            } while (assignment != NULL);
         }
     }
     free(requests);
@@ -583,16 +616,16 @@ void italian_shared_protection(network_t *italian_n)
 
 void italian_benchmark(network_t *italian_n)
 {
-    run_requests(italian_n, (uint64_t *)IT10_1, 0, "IT10 1 - No Protection - Benchmarking Algorithm - Descending", "reports/IT10_1-BENCHMARK-DESC.tex", italian_coordinates, NO_PROTECTION, FIRST_FIT_SLOT, LEAST_USED_SLOT, DEFAULT_MODULATION);
-    run_requests(italian_n, (uint64_t *)IT10_1, 1, "IT10 1 - No Protection - Benchmarking Algorithm - Ascending", "reports/IT10_1-BENCHMARK-ASC.tex", italian_coordinates, NO_PROTECTION, FIRST_FIT_SLOT, LEAST_USED_SLOT, DEFAULT_MODULATION);
-    run_requests(italian_n, (uint64_t *)IT10_2, 0, "IT10 2 - No Protection - Benchmarking Algorithm - Descending", "reports/IT10_2-BENCHMARK-DESC.tex", italian_coordinates, NO_PROTECTION, FIRST_FIT_SLOT, LEAST_USED_SLOT, DEFAULT_MODULATION);
-    run_requests(italian_n, (uint64_t *)IT10_2, 1, "IT10 2 - No Protection - Benchmarking Algorithm - Ascending", "reports/IT10_2-BENCHMARK-ASC.tex", italian_coordinates, NO_PROTECTION, FIRST_FIT_SLOT, LEAST_USED_SLOT, DEFAULT_MODULATION);
-    run_requests(italian_n, (uint64_t *)IT10_3, 0, "IT10 3 - No Protection - Benchmarking Algorithm - Descending", "reports/IT10_3-BENCHMARK-DESC.tex", italian_coordinates, NO_PROTECTION, FIRST_FIT_SLOT, LEAST_USED_SLOT, DEFAULT_MODULATION);
-    run_requests(italian_n, (uint64_t *)IT10_3, 1, "IT10 3 - No Protection - Benchmarking Algorithm - Ascending", "reports/IT10_3-BENCHMARK-ASC.tex", italian_coordinates, NO_PROTECTION, FIRST_FIT_SLOT, LEAST_USED_SLOT, DEFAULT_MODULATION);
-    run_requests(italian_n, (uint64_t *)IT10_4, 0, "IT10 4 - No Protection - Benchmarking Algorithm - Descending", "reports/IT10_4-BENCHMARK-DESC.tex", italian_coordinates, NO_PROTECTION, FIRST_FIT_SLOT, LEAST_USED_SLOT, DEFAULT_MODULATION);
-    run_requests(italian_n, (uint64_t *)IT10_4, 1, "IT10 4 - No Protection - Benchmarking Algorithm - Ascending", "reports/IT10_4-BENCHMARK-ASC.tex", italian_coordinates, NO_PROTECTION, FIRST_FIT_SLOT, LEAST_USED_SLOT, DEFAULT_MODULATION);
-    run_requests(italian_n, (uint64_t *)IT10_5, 0, "IT10 5 - No Protection - Benchmarking Algorithm - Descending", "reports/IT10_5-BENCHMARK-DESC.tex", italian_coordinates, NO_PROTECTION, FIRST_FIT_SLOT, LEAST_USED_SLOT, DEFAULT_MODULATION);
-    run_requests(italian_n, (uint64_t *)IT10_5, 1, "IT10 5 - No Protection - Benchmarking Algorithm - Ascending", "reports/IT10_5-BENCHMARK-ASC.tex", italian_coordinates, NO_PROTECTION, FIRST_FIT_SLOT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(italian_n, (uint64_t *)IT10_1, 0, "IT10 1 - No Protection - Benchmarking Algorithm - Descending", "reports/IT10_1-BENCHMARK-DESC.tex", italian_coordinates, NO_PROTECTION, FIXED_SHORTEST_PATH, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(italian_n, (uint64_t *)IT10_1, 1, "IT10 1 - No Protection - Benchmarking Algorithm - Ascending", "reports/IT10_1-BENCHMARK-ASC.tex", italian_coordinates, NO_PROTECTION, FIXED_SHORTEST_PATH, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(italian_n, (uint64_t *)IT10_2, 0, "IT10 2 - No Protection - Benchmarking Algorithm - Descending", "reports/IT10_2-BENCHMARK-DESC.tex", italian_coordinates, NO_PROTECTION, FIXED_SHORTEST_PATH, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(italian_n, (uint64_t *)IT10_2, 1, "IT10 2 - No Protection - Benchmarking Algorithm - Ascending", "reports/IT10_2-BENCHMARK-ASC.tex", italian_coordinates, NO_PROTECTION, FIXED_SHORTEST_PATH, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(italian_n, (uint64_t *)IT10_3, 0, "IT10 3 - No Protection - Benchmarking Algorithm - Descending", "reports/IT10_3-BENCHMARK-DESC.tex", italian_coordinates, NO_PROTECTION, FIXED_SHORTEST_PATH, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(italian_n, (uint64_t *)IT10_3, 1, "IT10 3 - No Protection - Benchmarking Algorithm - Ascending", "reports/IT10_3-BENCHMARK-ASC.tex", italian_coordinates, NO_PROTECTION, FIXED_SHORTEST_PATH, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(italian_n, (uint64_t *)IT10_4, 0, "IT10 4 - No Protection - Benchmarking Algorithm - Descending", "reports/IT10_4-BENCHMARK-DESC.tex", italian_coordinates, NO_PROTECTION, FIXED_SHORTEST_PATH, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(italian_n, (uint64_t *)IT10_4, 1, "IT10 4 - No Protection - Benchmarking Algorithm - Ascending", "reports/IT10_4-BENCHMARK-ASC.tex", italian_coordinates, NO_PROTECTION, FIXED_SHORTEST_PATH, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(italian_n, (uint64_t *)IT10_5, 0, "IT10 5 - No Protection - Benchmarking Algorithm - Descending", "reports/IT10_5-BENCHMARK-DESC.tex", italian_coordinates, NO_PROTECTION, FIXED_SHORTEST_PATH, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(italian_n, (uint64_t *)IT10_5, 1, "IT10 5 - No Protection - Benchmarking Algorithm - Ascending", "reports/IT10_5-BENCHMARK-ASC.tex", italian_coordinates, NO_PROTECTION, FIXED_SHORTEST_PATH, LEAST_USED_SLOT, DEFAULT_MODULATION);
 }
 
 void german_no_protection_custom_algorithm(network_t *german_n)
@@ -639,16 +672,16 @@ void german_shared_protection(network_t *german_n)
 
 void german_benchmark(network_t *german_n)
 {
-    run_requests(german_n, (uint64_t *)g7_1, 0, "g7 1 - No Protection - Benchmarking Algorithm - Descending", "reports/g7_1-BENCHMARK-DESC.tex", german_coordinates, NO_PROTECTION, FIRST_FIT_SLOT, LEAST_USED_SLOT, DEFAULT_MODULATION);
-    run_requests(german_n, (uint64_t *)g7_1, 1, "g7 1 - No Protection - Benchmarking Algorithm - Ascending", "reports/g7_1-BENCHMARK-ASC.tex", german_coordinates, NO_PROTECTION, FIRST_FIT_SLOT, LEAST_USED_SLOT, DEFAULT_MODULATION);
-    run_requests(german_n, (uint64_t *)g7_2, 0, "g7 2 - No Protection - Benchmarking Algorithm - Descending", "reports/g7_2-BENCHMARK-DESC.tex", german_coordinates, NO_PROTECTION, FIRST_FIT_SLOT, LEAST_USED_SLOT, DEFAULT_MODULATION);
-    run_requests(german_n, (uint64_t *)g7_2, 1, "g7 2 - No Protection - Benchmarking Algorithm - Ascending", "reports/g7_2-BENCHMARK-ASC.tex", german_coordinates, NO_PROTECTION, FIRST_FIT_SLOT, LEAST_USED_SLOT, DEFAULT_MODULATION);
-    run_requests(german_n, (uint64_t *)g7_3, 0, "g7 3 - No Protection - Benchmarking Algorithm - Descending", "reports/g7_3-BENCHMARK-DESC.tex", german_coordinates, NO_PROTECTION, FIRST_FIT_SLOT, LEAST_USED_SLOT, DEFAULT_MODULATION);
-    run_requests(german_n, (uint64_t *)g7_3, 1, "g7 3 - No Protection - Benchmarking Algorithm - Ascending", "reports/g7_3-BENCHMARK-ASC.tex", german_coordinates, NO_PROTECTION, FIRST_FIT_SLOT, LEAST_USED_SLOT, DEFAULT_MODULATION);
-    run_requests(german_n, (uint64_t *)g7_4, 0, "g7 4 - No Protection - Benchmarking Algorithm - Descending", "reports/g7_4-BENCHMARK-DESC.tex", german_coordinates, NO_PROTECTION, FIRST_FIT_SLOT, LEAST_USED_SLOT, DEFAULT_MODULATION);
-    run_requests(german_n, (uint64_t *)g7_4, 1, "g7 4 - No Protection - Benchmarking Algorithm - Ascending", "reports/g7_4-BENCHMARK-ASC.tex", german_coordinates, NO_PROTECTION, FIRST_FIT_SLOT, LEAST_USED_SLOT, DEFAULT_MODULATION);
-    run_requests(german_n, (uint64_t *)g7_5, 0, "g7 5 - No Protection - Benchmarking Algorithm - Descending", "reports/g7_5-BENCHMARK-DESC.tex", german_coordinates, NO_PROTECTION, FIRST_FIT_SLOT, LEAST_USED_SLOT, DEFAULT_MODULATION);
-    run_requests(german_n, (uint64_t *)g7_5, 1, "g7 5 - No Protection - Benchmarking Algorithm - Ascending", "reports/g7_5-BENCHMARK-ASC.tex", german_coordinates, NO_PROTECTION, FIRST_FIT_SLOT, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_1, 0, "g7 1 - No Protection - Benchmarking Algorithm - Descending", "reports/g7_1-BENCHMARK-DESC.tex", german_coordinates, NO_PROTECTION, FIXED_SHORTEST_PATH, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_1, 1, "g7 1 - No Protection - Benchmarking Algorithm - Ascending", "reports/g7_1-BENCHMARK-ASC.tex", german_coordinates, NO_PROTECTION, FIXED_SHORTEST_PATH, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_2, 0, "g7 2 - No Protection - Benchmarking Algorithm - Descending", "reports/g7_2-BENCHMARK-DESC.tex", german_coordinates, NO_PROTECTION, FIXED_SHORTEST_PATH, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_2, 1, "g7 2 - No Protection - Benchmarking Algorithm - Ascending", "reports/g7_2-BENCHMARK-ASC.tex", german_coordinates, NO_PROTECTION, FIXED_SHORTEST_PATH, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_3, 0, "g7 3 - No Protection - Benchmarking Algorithm - Descending", "reports/g7_3-BENCHMARK-DESC.tex", german_coordinates, NO_PROTECTION, FIXED_SHORTEST_PATH, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_3, 1, "g7 3 - No Protection - Benchmarking Algorithm - Ascending", "reports/g7_3-BENCHMARK-ASC.tex", german_coordinates, NO_PROTECTION, FIXED_SHORTEST_PATH, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_4, 0, "g7 4 - No Protection - Benchmarking Algorithm - Descending", "reports/g7_4-BENCHMARK-DESC.tex", german_coordinates, NO_PROTECTION, FIXED_SHORTEST_PATH, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_4, 1, "g7 4 - No Protection - Benchmarking Algorithm - Ascending", "reports/g7_4-BENCHMARK-ASC.tex", german_coordinates, NO_PROTECTION, FIXED_SHORTEST_PATH, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_5, 0, "g7 5 - No Protection - Benchmarking Algorithm - Descending", "reports/g7_5-BENCHMARK-DESC.tex", german_coordinates, NO_PROTECTION, FIXED_SHORTEST_PATH, LEAST_USED_SLOT, DEFAULT_MODULATION);
+    run_requests(german_n, (uint64_t *)g7_5, 1, "g7 5 - No Protection - Benchmarking Algorithm - Ascending", "reports/g7_5-BENCHMARK-ASC.tex", german_coordinates, NO_PROTECTION, FIXED_SHORTEST_PATH, LEAST_USED_SLOT, DEFAULT_MODULATION);
 }
 
 void run_solutions()
@@ -656,16 +689,16 @@ void run_solutions()
     mkdir("./reports", S_IRWXU | S_IRWXG | S_IROTH);
     network_t *german_n = build_network(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE);
 
-    german_benchmark(german_n);
-    german_no_protection_custom_algorithm(german_n);
-    german_dedicated_protection(german_n);
-    german_shared_protection(german_n);
+    // german_benchmark(german_n);
+    // german_no_protection_custom_algorithm(german_n);
+    // german_dedicated_protection(german_n);
+    // german_shared_protection(german_n);
     free_network(german_n);
     network_t *italian_n = build_network(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE);
-    italian_benchmark(italian_n);
-    italian_no_protection_custom_algorithm(italian_n);
+    //italian_benchmark(italian_n);
+    //italian_no_protection_custom_algorithm(italian_n);
     italian_dedicated_protection(italian_n);
-    italian_shared_protection(italian_n);
+    // italian_shared_protection(italian_n);
     free_network(italian_n);
 }
 
