@@ -236,13 +236,13 @@ path_t *find_least_maximally_loaded_path(const network_t *network, uint64_t from
     return k_paths[best_path_index];
 }
 
-typedef __ssize_t (*modulator_algorith)(const modulation_format *formats, uint64_t formats_dim, assignment_t *assignment_ret);
+typedef __ssize_t (*modulator_algorithm)(const modulation_format *formats, uint64_t formats_dim, assignment_t *assignment_ret);
 
 typedef path_t **(*routing_assigner)(const network_t *network, connection_request *requests, uint64_t request_count, assignment_t *assignments_ret, assignment_t *protections, protection_type protection);
 typedef void (*modulation_assigner)(const network_t *network, connection_request *requests, uint64_t request_count, assignment_t *assignments_ret, assignment_t *protections_ret, protection_type protection, const modulation_format *formats, uint64_t formats_dim);
 typedef void (*slot_assigner)(const network_t *network, const modulation_format *formats, assignment_t *assignments_ret, assignment_t *protections, protection_type protection, uint64_t request_count, dynamic_char_array *link_slot_usages_ret);
 
-void run_modulator(const network_t *network, connection_request *requests, uint64_t request_count, assignment_t *assignments_ret, const modulation_format *formats, uint64_t formats_dim, modulator_algorith modulator)
+void run_modulator(const network_t *network, connection_request *requests, uint64_t request_count, assignment_t *assignments_ret, const modulation_format *formats, uint64_t formats_dim, modulator_algorithm modulator)
 {
     for (uint64_t request_index = 0; request_index < request_count; request_index++)
     {
@@ -462,7 +462,6 @@ int is_link_disjoint(const network_t *network, uint64_t from, uint64_t to, const
     return 1;
 }
 
-// obviously, don't consider source and sink nodes
 int is_node_disjoint_ignore_sink_source(const network_t *network, uint64_t from, uint64_t to, const void *data)
 {
     const path_t *_data = (const path_t *)(data);
