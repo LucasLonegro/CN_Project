@@ -2,6 +2,10 @@
 #define NTWK_H
 #include <stdint.h>
 #include <stdio.h>
+#ifdef _WIN32
+#include <stddef.h>
+typedef signed long __ssize_t;  
+#endif
 
 typedef struct path_t
 {

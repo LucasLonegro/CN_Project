@@ -151,7 +151,7 @@ __ssize_t assign_modulation_format(const modulation_format *formats, uint64_t fo
         }
     }
     if (format_index == -1)
-        return -1;
+        return -1;//连distance都不能满足
     uint64_t load = assignment_ret->load;
     assignment_ret->load = formats[format_index].line_rate;
     return load - formats[format_index].line_rate;

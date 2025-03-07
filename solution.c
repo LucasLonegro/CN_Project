@@ -2,8 +2,17 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <math.h>
-#include <sys/stat.h>
-#include <sys/types.h>
+//#include <sys/stat.h>
+//#include <sys/types.h>
+
+#ifdef _WIN32
+    #include <direct.h>
+    #define mkdir(path, mode) _mkdir(path)  
+#else
+    #include <sys/stat.h>
+    #include <sys/types.h>
+#endif
+
 #include "network.h"
 #include "problem.h"
 #include "routing_solution.h"
@@ -384,20 +393,87 @@ void print_report(const network_t *network, assignment_t *assignments, uint64_t 
     }
     __ssize_t highest_fsu = -1;
     for (uint64_t i = 0; i < requests_count; i++)
-    {
+    {//go over all requests
         __ssize_t slot = highest_fsu_in_assignent(assignments + i);
         if (slot > highest_fsu)
             highest_fsu = slot;
     }
+    if (protection == DEDICATED_PROTECTION)///////
+    {
+        for(uint64_t i = 0; i < requests_count; i++)
+        {
+            if (protections + i != NULL)
+            {
+                __ssize_t slot = highest_fsu_in_assignent(protections + i);
+                if (slot > highest_fsu)
+                    highest_fsu = slot;
+            }
+        }
+    }/////////
+
+    //////////
     uint64_t total_fsus = 0;
     for (uint64_t i = 0; i < requests_count; i++)
     {
-        total_fsus += assignments[i].end_slot - assignments[i].start_slot;
+        assignment_t* temp = assignments + i;
+        do{
+            total_fsus += temp->end_slot - temp->start_slot;
+            if (temp->is_split == 1)
+            {
+                temp = temp->split;
+             
+            }else {
+                break;
+            }
+
+        }while(temp != NULL);
+
     }
+
+    for (uint64_t i = 0; i < requests_count; i++)
+    {
+        assignment_t* temp = assignments + i;
+        do{
+            total_fsus += temp->end_slot - temp->start_slot;
+            if (temp->is_split == 1)
+            {
+                temp = temp->split;
+             
+            }else {
+                break;
+            }
+
+        }while(temp != NULL);
+
+    }
+    if (protection == DEDICATED_PROTECTION)
+    {
+        for (uint64_t i = 0; i < requests_count; i++)
+        {
+            if (protections + i != NULL)
+            {
+                assignment_t* temp = protections + i;
+                do{
+                    total_fsus += temp->end_slot - temp->start_slot;
+                    if (temp->is_split == 1)
+                    {
+                        temp = temp->split;
+                    }else{
+                        break;
+                    }
+
+                }while(temp != NULL);
+            }else{
+                continue;
+            }
+    
+        }
+    }
+    ////////////
     uint64_t format_frequencies[MODULATION_FORMATS_DIM] = {0};
     double transponder_cost = 0;
     for (uint64_t i = 0; i < requests_count; i++)
-    {
+    {//go over all requests
         assignment_t *aux = assignments + i;
         do
         {
@@ -410,6 +486,29 @@ void print_report(const network_t *network, assignment_t *assignments, uint64_t 
         } while (aux != NULL);
     }
 
+    if (protection == DEDICATED_PROTECTION)
+    {
+        for(uint64_t i = 0; i < requests_count; i++)
+        {
+            if (protections + i != NULL)
+            {
+                assignment_t *aux = protections + i;
+                do{
+                    format_frequencies[aux->format]++;
+                    transponder_cost += formats[aux->format].cost;
+                    if (aux->is_split)
+                        aux = aux->split;
+                    else 
+                        aux = NULL;
+
+                }while(aux != NULL);
+            }else{
+                continue;
+            }
+        }
+    }
+    //////////////////////////////
+    
     print_section(f, "Performance Parameters");
     fprintf(f, "Highest link load: %ld\\\\\n", highest_loaded_link);
     fprintf(f, "Highest used fsu: %ld out of %d\\\\\n", highest_fsu, MAX_SPECTRAL_SLOTS);
@@ -689,16 +788,16 @@ void run_solutions()
     mkdir("./reports", S_IRWXU | S_IRWXG | S_IROTH);
     network_t *german_n = build_network(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE);
 
-    // german_benchmark(german_n);
-    // german_no_protection_custom_algorithm(german_n);
-    // german_dedicated_protection(german_n);
-    // german_shared_protection(german_n);
+    german_benchmark(german_n);
+    german_no_protection_custom_algorithm(german_n);
+    german_dedicated_protection(german_n);
+    german_shared_protection(german_n);
     free_network(german_n);
     network_t *italian_n = build_network(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE);
-    //italian_benchmark(italian_n);
-    //italian_no_protection_custom_algorithm(italian_n);
+    italian_benchmark(italian_n);
+    italian_no_protection_custom_algorithm(italian_n);
     italian_dedicated_protection(italian_n);
-    // italian_shared_protection(italian_n);
+    italian_shared_protection(italian_n);
     free_network(italian_n);
 }
 
