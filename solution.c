@@ -467,23 +467,6 @@ void print_report(const network_t *network, assignment_t *assignments, uint64_t 
         }while(temp != NULL);
 
     }
-
-    for (uint64_t i = 0; i < requests_count; i++)
-    {
-        assignment_t* temp = assignments + i;
-        do{
-            total_fsus += temp->end_slot - temp->start_slot;
-            if (temp->is_split == 1)
-            {
-                temp = temp->split;
-             
-            }else {
-                break;
-            }
-
-        }while(temp != NULL);
-
-    }
     if (protection == DEDICATED_PROTECTION)
     {
         for (uint64_t i = 0; i < requests_count; i++)
