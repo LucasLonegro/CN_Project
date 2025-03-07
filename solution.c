@@ -100,15 +100,33 @@ __ssize_t highest_fsu_in_assignent(assignment_t *assignment)
     return assignment->end_slot;
 }
 
+//////////
 double utilization_entropy(const dynamic_char_array *frequency_slots)
-{
+{ 
     if (frequency_slots->size <= 0)
-        return 0;
+        {
+            return 0;
+        }
+    int UUSED = 1;
+    int UN_USED = 0;
     uint64_t status_changes = 0;
-    int status = get_element(frequency_slots, 0) == USED ? USED : UNUSED;
+    //int status = get_element(frequency_slots, 0) == USED ? USED : UNUSED;
+    int status = get_element(frequency_slots, 0);
+    if (status ==  USED || status == PROTECTION_USED){
+        status = UUSED;
+    }else{
+        status = UN_USED;
+    }
+
     for (uint64_t i = 0; i < frequency_slots->size; i++)
-    {
-        int slot_status = get_element(frequency_slots, i) == USED ? USED : UNUSED;
+    {//go over all FSUs
+        int slot_status = get_element(frequency_slots, i);
+        if (slot_status == USED || status == PROTECTION_USED){
+            slot_status = UUSED;
+        }else{
+            slot_status = UN_USED;
+        }
+
         if (slot_status != status)
         {
             status = slot_status;
@@ -118,21 +136,40 @@ double utilization_entropy(const dynamic_char_array *frequency_slots)
     return (double)status_changes / (MAX_SPECTRAL_SLOTS - 1);
 }
 
+///////////
 double shannon_entropy(const dynamic_char_array *frequency_slots)
 {
     if (frequency_slots->size <= 0)
         return 0;
+
+    int UUSED = 1;
+    int UN_USED = 0;
     double entropy = 0;
     uint64_t status_changes = 0;
     uint64_t block_size = 0;
-    int status = get_element(frequency_slots, 0) == USED ? USED : UNUSED;
+    //int status = get_element(frequency_slots, 0) == USED ? USED : UNUSED;
+
+    int status = get_element(frequency_slots, 0);
+    if (status ==  USED || status == PROTECTION_USED){
+        status = UUSED;
+    }else{
+        status = UN_USED;
+    }
 
     for (uint64_t i = 0; i < frequency_slots->size; i++)
-    {
-        int slot_status = get_element(frequency_slots, i) == USED ? USED : UNUSED;
+    {//go over all FSUs
+        //int slot_status = get_element(frequency_slots, i) == USED ? USED : UNUSED;
+
+        int slot_status = get_element(frequency_slots, i);
+        if (slot_status == USED || status == PROTECTION_USED){
+            slot_status = UUSED;
+        }else{
+            slot_status = UN_USED;
+        }        
+
         if (slot_status != status)
         {
-            if (slot_status == UNUSED)
+            if (slot_status == UN_USED)
                 entropy += ((double)block_size / MAX_SPECTRAL_SLOTS) * log((double)block_size / MAX_SPECTRAL_SLOTS);
             status = slot_status;
             status_changes++;
@@ -143,6 +180,7 @@ double shannon_entropy(const dynamic_char_array *frequency_slots)
 
     return -entropy;
 }
+//////////////
 
 void bubble_sort_connection_requests(connection_request *requests, uint64_t requests_dim, int ascending)
 {
