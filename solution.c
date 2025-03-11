@@ -86,7 +86,7 @@ void print_assignment_latex(const network_t *network, assignment_t *assignment, 
     path_drawing assignment_path = {.line = SOLID_LINE, .offset = OFFSET_DOWN, .path = assignment->path, .color = get_hex_color(*assignment), .data = &data1, .labeler = read_slots};
     path_drawing protection_path = {.line = DOTTED_LINE, .offset = OFFSET_DOWN, .path = protection->path, .color = get_hex_color(*protection), .data = &data2, .labeler = read_slots};
     path_drawing paths[] = {assignment_path, protection_path};
-    print_graph(network, noop_labeler, NULL, coordinates, paths, protection->path->length == -1 ? 1 : 2, 0.9, 0.8, file, 0);
+    print_graph(network, noop_labeler, NULL, coordinates, paths, protection->path == NULL || protection->path->length == -1 ? 1 : 2, 0.9, 0.8, file, 0);
 }
 
 __ssize_t highest_fsu_in_assignent(assignment_t *assignment)
@@ -227,7 +227,7 @@ void print_link_usage(uint64_t topology_node_count, uint64_t *total_link_loads, 
         index++;
     }
     char *legends[] = {"Load Range"};
-    bar_plot p = {.width = BAR_PLOT_WIDTH, .samples_count = 1, .legends = legends, .y_label = "Frequency", .data_points = (data_point *)points, .x_labels_count = (LINK_USAGE_MAX_PLOT / LINK_USAGE_PLOT_INTERVAL), .x_labels = link_loads_x_labels};
+    bar_plot p = {.width = BIG_BAR_PLOT_WIDTH, .samples_count = 1, .legends = legends, .y_label = "Frequency", .data_points = (data_point *)points, .x_labels_count = (LINK_USAGE_MAX_PLOT / LINK_USAGE_PLOT_INTERVAL), .x_labels = link_loads_x_labels};
     uint64_t link_usages[LINK_USAGE_MAX_PLOT / LINK_USAGE_PLOT_INTERVAL + 1];
     for (uint64_t link_index = 0; link_index < topology_node_count * topology_node_count; link_index++)
     {
@@ -809,16 +809,16 @@ void run_solutions()
     mkdir("./reports", S_IRWXU | S_IRWXG | S_IROTH);
     network_t *german_n = build_network(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE);
 
-    german_benchmark(german_n);
+    //german_benchmark(german_n);
     german_no_protection_custom_algorithm(german_n);
-    german_dedicated_protection(german_n);
-    german_shared_protection(german_n);
+    //german_dedicated_protection(german_n);
+    //german_shared_protection(german_n);
     free_network(german_n);
     network_t *italian_n = build_network(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE);
-    italian_benchmark(italian_n);
+    //italian_benchmark(italian_n);
     italian_no_protection_custom_algorithm(italian_n);
-    italian_dedicated_protection(italian_n);
-    italian_shared_protection(italian_n);
+    //italian_dedicated_protection(italian_n);
+    //italian_shared_protection(italian_n);
     free_network(italian_n);
 }
 
