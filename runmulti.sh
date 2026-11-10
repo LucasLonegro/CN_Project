@@ -1,11 +1,18 @@
+#!/bin/bash
 rm -rf ./reports
 gcc -pedantic -Wall -std=c99 -g *.c -lm
-./a.out
+./a.out "$@" || exit 1
 cd ./reports
-count=0
 N=12
+compile='count=0
 for filename in ./*.tex; do
     latexmk -silent -pdf "${filename}" &
-    (( ++count % N == 0)) && wait
+    (( ++count % '$N' == 0 )) && wait
 done
-latexmk -c
+wait
+latexmk -c'
+if command -v latexmk >/dev/null; then
+    bash -c "$compile"
+else
+    docker run --rm -u "$(id -u):$(id -g)" -v "$PWD":/w -w /w texlive/texlive:latest bash -c "$compile"
+fi

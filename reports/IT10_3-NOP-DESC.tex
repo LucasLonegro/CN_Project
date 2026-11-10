@@ -1,0 +1,661 @@
+\documentclass[10pt]{article}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{mathtools}
+\usepackage{booktabs}
+\usepackage{adjustbox}
+\usepackage[left=1.5cm, right=2cm, top=1.5cm, bottom=2cm]{geometry}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usetikzlibrary{arrows.meta,positioning,calc}
+\setlength\parindent{0pt}
+\title{IT10 3 - No Protection - Custom Algorithm - Descending}
+\date{}
+\author{}
+
+\begin{document}
+\maketitle
+\section*{Topology}
+\begin{center}\begin{adjustbox}{max width=\linewidth}
+\begin{tikzpicture}[baseline, >={Stealth[length=2mm]},
+  netnode/.style={circle, draw, thick, fill=gray!10, minimum size=7mm, inner sep=1pt},
+  link/.style={thick},
+  linklabel/.style={font=\scriptsize, inner sep=1pt, fill=white, fill opacity=0.85, text opacity=1}]
+\node[netnode] (S1) at (4.000,8.000) {1};
+\node[netnode] (S2) at (7.000,8.000) {2};
+\node[netnode] (S3) at (1.000,8.000) {3};
+\node[netnode] (S4) at (10.000,8.000) {4};
+\node[netnode] (S5) at (0.000,4.000) {5};
+\node[netnode] (S6) at (1.000,0.000) {6};
+\node[netnode] (S7) at (4.000,4.000) {7};
+\node[netnode] (S8) at (8.000,4.000) {8};
+\node[netnode] (S9) at (5.600,0.000) {9};
+\node[netnode] (S10) at (8.000,0.000) {10};
+\draw[link] (S1) to node[linklabel] {150} (S2);
+\draw[link] (S1) to node[linklabel] {210} (S3);
+\draw[link] (S1) to node[linklabel] {350} (S7);
+\draw[link] (S2) to node[linklabel] {420} (S4);
+\draw[link] (S2) to node[linklabel] {310} (S7);
+\draw[link] (S3) to node[linklabel] {200} (S5);
+\draw[link] (S4) to node[linklabel] {460} (S8);
+\draw[link] (S5) to node[linklabel] {100} (S6);
+\draw[link] (S5) to node[linklabel] {90} (S7);
+\draw[link] (S6) to node[linklabel] {210} (S7);
+\draw[link] (S6) to node[linklabel] {270} (S9);
+\draw[link] (S7) to node[linklabel] {180} (S8);
+\draw[link] (S7) to node[linklabel] {200} (S9);
+\draw[link] (S8) to node[linklabel] {120} (S10);
+\draw[link] (S9) to node[linklabel] {170} (S10);
+\end{tikzpicture}
+\end{adjustbox}\end{center}
+\section*{Performance Parameters}
+\begin{center}\begin{tabular}{lr}
+\toprule
+Highest link load & 304 Gb/s \\
+Highest used FSU & 275 / 320 \\
+Total used FSUs & 267 \\
+Transponder cost & 133.5 \\
+\midrule
+SC-DP-QPSK transponders & 89 \\
+SC-DP-16QAM transponders & 0 \\
+DP-16QAM transponders & 0 \\
+\bottomrule
+\end{tabular}\end{center}
+\clearpage
+\section*{Link Load Map}
+\begin{center}\begin{adjustbox}{max width=\linewidth}
+\begin{tikzpicture}[baseline, >={Stealth[length=2mm]},
+  netnode/.style={circle, draw, thick, fill=gray!10, minimum size=7mm, inner sep=1pt},
+  link/.style={line width=1.4pt},
+  linklabel/.style={font=\scriptsize, inner sep=1pt, fill=white, fill opacity=0.85, text opacity=1}]
+\node[netnode] (S1) at (6.000,10.000) {1};
+\node[netnode] (S2) at (10.500,10.000) {2};
+\node[netnode] (S3) at (1.500,10.000) {3};
+\node[netnode] (S4) at (15.000,10.000) {4};
+\node[netnode] (S5) at (0.000,5.000) {5};
+\node[netnode] (S6) at (1.500,0.000) {6};
+\node[netnode] (S7) at (6.000,5.000) {7};
+\node[netnode] (S8) at (12.000,5.000) {8};
+\node[netnode] (S9) at (8.400,0.000) {9};
+\node[netnode] (S10) at (12.000,0.000) {10};
+\draw[link, ->, draw={rgb,255:red,122;green,201;blue,75}] (S1) to[bend left=12] node[linklabel, auto] {59} (S2);
+\draw[link, ->, draw={rgb,255:red,236;green,132;blue,39}] (S1) to[bend left=12] node[linklabel, auto] {233} (S3);
+\draw[link, ->, draw={rgb,255:red,238;green,164;blue,27}] (S1) to[bend left=12] node[linklabel, auto] {193} (S7);
+\draw[link, ->, draw={rgb,255:red,199;green,198;blue,36}] (S2) to[bend left=12] node[linklabel, auto] {119} (S1);
+\draw[link, ->, draw={rgb,255:red,238;green,160;blue,29}] (S2) to[bend left=12] node[linklabel, auto] {198} (S4);
+\draw[link, ->, draw={rgb,255:red,231;green,76;blue,60}] (S2) to[bend left=12] node[linklabel, auto] {304} (S7);
+\draw[link, ->, draw={rgb,255:red,234;green,111;blue,47}] (S3) to[bend left=12] node[linklabel, auto] {260} (S1);
+\draw[link, ->, draw={rgb,255:red,234;green,115;blue,45}] (S3) to[bend left=12] node[linklabel, auto] {255} (S5);
+\draw[link, ->, draw={rgb,255:red,237;green,149;blue,33}] (S4) to[bend left=12] node[linklabel, auto] {212} (S2);
+\draw[link, ->, draw={rgb,255:red,239;green,175;blue,23}] (S4) to[bend left=12] node[linklabel, auto] {179} (S8);
+\draw[link, ->, draw={rgb,255:red,234;green,112;blue,47}] (S5) to[bend left=12] node[linklabel, auto] {259} (S3);
+\draw[link, ->, draw={rgb,255:red,240;green,182;blue,20}] (S5) to[bend left=12] node[linklabel, auto] {170} (S6);
+\draw[link, ->, draw={rgb,255:red,238;green,161;blue,28}] (S5) to[bend left=12] node[linklabel, auto] {196} (S7);
+\draw[link, ->, draw={rgb,255:red,241;green,191;blue,17}] (S6) to[bend left=12] node[linklabel, auto] {158} (S5);
+\draw[link, ->, draw={rgb,255:red,222;green,197;blue,25}] (S6) to[bend left=12] node[linklabel, auto] {137} (S7);
+\draw[link, ->, draw={rgb,255:red,239;green,178;blue,22}] (S6) to[bend left=12] node[linklabel, auto] {175} (S9);
+\draw[link, ->, draw={rgb,255:red,239;green,171;blue,24}] (S7) to[bend left=12] node[linklabel, auto] {184} (S1);
+\draw[link, ->, draw={rgb,255:red,232;green,83;blue,57}] (S7) to[bend left=12] node[linklabel, auto] {295} (S2);
+\draw[link, ->, draw={rgb,255:red,235;green,128;blue,40}] (S7) to[bend left=12] node[linklabel, auto] {238} (S5);
+\draw[link, ->, draw={rgb,255:red,237;green,149;blue,33}] (S7) to[bend left=12] node[linklabel, auto] {212} (S6);
+\draw[link, ->, draw={rgb,255:red,233;green,100;blue,51}] (S7) to[bend left=12] node[linklabel, auto] {274} (S8);
+\draw[link, ->, draw={rgb,255:red,235;green,127;blue,41}] (S7) to[bend left=12] node[linklabel, auto] {239} (S9);
+\draw[link, ->, draw={rgb,255:red,215;green,197;blue,28}] (S8) to[bend left=12] node[linklabel, auto] {132} (S4);
+\draw[link, ->, draw={rgb,255:red,233;green,97;blue,52}] (S8) to[bend left=12] node[linklabel, auto] {278} (S7);
+\draw[link, ->, draw={rgb,255:red,239;green,177;blue,22}] (S8) to[bend left=12] node[linklabel, auto] {176} (S10);
+\draw[link, ->, draw={rgb,255:red,231;green,196;blue,20}] (S9) to[bend left=12] node[linklabel, auto] {144} (S6);
+\draw[link, ->, draw={rgb,255:red,233;green,100;blue,51}] (S9) to[bend left=12] node[linklabel, auto] {273} (S7);
+\draw[link, ->, draw={rgb,255:red,236;green,135;blue,38}] (S9) to[bend left=12] node[linklabel, auto] {229} (S10);
+\draw[link, ->, draw={rgb,255:red,240;green,188;blue,18}] (S10) to[bend left=12] node[linklabel, auto] {162} (S8);
+\draw[link, ->, draw={rgb,255:red,234;green,108;blue,48}] (S10) to[bend left=12] node[linklabel, auto] {263} (S9);
+\end{tikzpicture}
+\end{adjustbox}\end{center}
+\begin{center}\begin{tikzpicture}
+\definecolor{scalelow}{RGB}{46,204,113}\definecolor{scalemid}{RGB}{241,196,15}\definecolor{scalehigh}{RGB}{231,76,60}
+\shade[left color=scalelow, right color=scalemid] (0,0) rectangle (3,0.3);
+\shade[left color=scalemid, right color=scalehigh] (3,0) rectangle (6,0.3);
+\draw[gray] (0,0) rectangle (6,0.3);
+\node[below, font=\scriptsize] at (0,0) {0};
+\node[below, font=\scriptsize] at (6,0) {304};
+\node[left, font=\small] at (0,0.15) {Load (Gb/s)};
+\end{tikzpicture}\end{center}
+\section*{Link Load Distribution}
+
+\begin{center}\begin{tikzpicture}
+\begin{axis}[
+  ybar, bar width=0.771cm, width=18.000cm, height=7cm,
+  ymin=0, ymajorgrids, grid style={gray!25}, axis lines*=left,
+  enlarge x limits={abs=0.771cm}, xtick=data, major x tick style={draw=none},
+  x tick label style={rotate=90, font=\scriptsize, /pgf/number format/1000 sep=},
+  legend style={at={(0.5,-0.3)}, anchor=north, legend columns=-1, draw=none},
+  ylabel={Links},
+  xlabel={Link load (Gb/s)},
+  symbolic x coords={0-25,25-50,50-75,75-100,100-125,125-150,150-175,175-200,200-225,225-250,250-275,275-300,300-325}]
+\addplot[fill={rgb,255:red,66;green,133;blue,244}, draw=none] coordinates {(0-25,0.000) (25-50,0.000) (50-75,1.000) (75-100,0.000) (100-125,1.000) (125-150,3.000) (150-175,3.000) (175-200,7.000) (200-225,2.000) (225-250,4.000) (250-275,6.000) (275-300,2.000) (300-325,1.000) };
+\end{axis}
+\end{tikzpicture}\end{center}
+\clearpage
+\section*{Spectrum Occupancy}
+\begin{center}\begin{adjustbox}{max width=\linewidth}
+\begin{tikzpicture}[x=0.0536cm, y=-0.32cm]
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (95,0) rectangle (98,1);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (98,0) rectangle (99,1);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (264,0) rectangle (267,1);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (267,0) rectangle (268,1);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (268,0) rectangle (271,1);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (271,0) rectangle (272,1);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (272,0) rectangle (275,1);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (275,0) rectangle (276,1);
+\node[left, font=\scriptsize] at (0,0.5) {1\(\to\)2};
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (6,1) rectangle (9,2);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (9,1) rectangle (10,2);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (24,1) rectangle (27,2);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (27,1) rectangle (28,2);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (65,1) rectangle (68,2);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (68,1) rectangle (69,2);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (187,1) rectangle (190,2);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (190,1) rectangle (191,2);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (196,1) rectangle (199,2);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (199,1) rectangle (200,2);
+\node[left, font=\scriptsize] at (0,1.5) {1\(\to\)3};
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (83,2) rectangle (86,3);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (86,2) rectangle (87,3);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (99,2) rectangle (102,3);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (102,2) rectangle (103,3);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (132,2) rectangle (135,3);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (135,2) rectangle (136,3);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (199,2) rectangle (202,3);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (202,2) rectangle (203,3);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (230,2) rectangle (233,3);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (233,2) rectangle (234,3);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (251,2) rectangle (254,3);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (254,2) rectangle (255,3);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (255,2) rectangle (258,3);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (258,2) rectangle (259,3);
+\node[left, font=\scriptsize] at (0,2.5) {1\(\to\)7};
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (117,3) rectangle (120,4);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (120,3) rectangle (121,4);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (187,3) rectangle (190,4);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (190,3) rectangle (191,4);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (196,3) rectangle (199,4);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (199,3) rectangle (200,4);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (215,3) rectangle (218,4);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (218,3) rectangle (219,4);
+\node[left, font=\scriptsize] at (0,3.5) {2\(\to\)1};
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (95,4) rectangle (98,5);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (98,4) rectangle (99,5);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (102,4) rectangle (105,5);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (105,4) rectangle (106,5);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (166,4) rectangle (169,5);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (169,4) rectangle (170,5);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (184,4) rectangle (187,5);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (187,4) rectangle (188,5);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (209,4) rectangle (212,5);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (212,4) rectangle (213,5);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (224,4) rectangle (227,5);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (227,4) rectangle (228,5);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (268,4) rectangle (271,5);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (271,4) rectangle (272,5);
+\node[left, font=\scriptsize] at (0,4.5) {2\(\to\)4};
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (21,5) rectangle (24,6);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (24,5) rectangle (25,6);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (27,5) rectangle (30,6);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (30,5) rectangle (31,6);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (42,5) rectangle (45,6);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (45,5) rectangle (46,6);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (52,5) rectangle (55,6);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (55,5) rectangle (56,6);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (147,5) rectangle (150,6);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (150,5) rectangle (151,6);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (154,5) rectangle (157,6);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (157,5) rectangle (158,6);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (233,5) rectangle (236,6);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (236,5) rectangle (237,6);
+\node[left, font=\scriptsize] at (0,5.5) {2\(\to\)7};
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (0,6) rectangle (3,7);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (3,6) rectangle (4,7);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (9,6) rectangle (12,7);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (12,6) rectangle (13,7);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (95,6) rectangle (98,7);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (98,6) rectangle (99,7);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (99,6) rectangle (102,7);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (102,6) rectangle (103,7);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (199,6) rectangle (202,7);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (202,6) rectangle (203,7);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (272,6) rectangle (275,7);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (275,6) rectangle (276,7);
+\node[left, font=\scriptsize] at (0,6.5) {3\(\to\)1};
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (6,7) rectangle (9,8);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (9,7) rectangle (10,8);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (30,7) rectangle (33,8);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (33,7) rectangle (34,8);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (68,7) rectangle (71,8);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (71,7) rectangle (72,8);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (80,7) rectangle (83,8);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (83,7) rectangle (84,8);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (108,7) rectangle (111,8);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (111,7) rectangle (112,8);
+\node[left, font=\scriptsize] at (0,7.5) {3\(\to\)5};
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (52,8) rectangle (55,9);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (55,8) rectangle (56,9);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (117,8) rectangle (120,9);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (120,8) rectangle (121,9);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (150,8) rectangle (153,9);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (153,8) rectangle (154,9);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (154,8) rectangle (157,9);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (157,8) rectangle (158,9);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (163,8) rectangle (166,9);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (166,8) rectangle (167,9);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (187,8) rectangle (190,9);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (190,8) rectangle (191,9);
+\node[left, font=\scriptsize] at (0,8.5) {4\(\to\)2};
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (45,9) rectangle (48,10);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (48,9) rectangle (49,10);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (55,9) rectangle (58,10);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (58,9) rectangle (59,10);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (111,9) rectangle (114,10);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (114,9) rectangle (115,10);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (166,9) rectangle (169,10);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (169,9) rectangle (170,10);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (258,9) rectangle (261,10);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (261,9) rectangle (262,10);
+\node[left, font=\scriptsize] at (0,9.5) {4\(\to\)8};
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (0,10) rectangle (3,11);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (3,10) rectangle (4,11);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (12,10) rectangle (15,11);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (15,10) rectangle (16,11);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (89,10) rectangle (92,11);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (92,10) rectangle (93,11);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (160,10) rectangle (163,11);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (163,10) rectangle (164,11);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (221,10) rectangle (224,11);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (224,10) rectangle (225,11);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (248,10) rectangle (251,11);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (251,10) rectangle (252,11);
+\node[left, font=\scriptsize] at (0,10.5) {5\(\to\)3};
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (30,11) rectangle (33,12);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (33,11) rectangle (34,12);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (80,11) rectangle (83,12);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (83,11) rectangle (84,12);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (202,11) rectangle (205,12);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (205,11) rectangle (206,12);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (218,11) rectangle (221,12);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (221,11) rectangle (222,12);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (236,11) rectangle (239,12);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (239,11) rectangle (240,12);
+\node[left, font=\scriptsize] at (0,11.5) {5\(\to\)6};
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (3,12) rectangle (6,13);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (6,12) rectangle (7,13);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (108,12) rectangle (111,13);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (111,12) rectangle (112,13);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (135,12) rectangle (138,13);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (138,12) rectangle (139,13);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (212,12) rectangle (215,13);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (215,12) rectangle (216,13);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (224,12) rectangle (227,13);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (227,12) rectangle (228,13);
+\node[left, font=\scriptsize] at (0,12.5) {5\(\to\)7};
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (39,13) rectangle (42,14);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (42,13) rectangle (43,14);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (62,13) rectangle (65,14);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (65,13) rectangle (66,14);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (89,13) rectangle (92,14);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (92,13) rectangle (93,14);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (248,13) rectangle (251,14);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (251,13) rectangle (252,14);
+\node[left, font=\scriptsize] at (0,13.5) {6\(\to\)5};
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (141,14) rectangle (144,15);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (144,14) rectangle (145,15);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (169,14) rectangle (172,15);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (172,14) rectangle (173,15);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (205,14) rectangle (208,15);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (208,14) rectangle (209,15);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (209,14) rectangle (212,15);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (212,14) rectangle (213,15);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (239,14) rectangle (242,15);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (242,14) rectangle (243,15);
+\node[left, font=\scriptsize] at (0,14.5) {6\(\to\)7};
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (30,15) rectangle (33,16);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (33,15) rectangle (34,16);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (86,15) rectangle (89,16);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (89,15) rectangle (90,16);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (172,15) rectangle (175,16);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (175,15) rectangle (176,16);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (202,15) rectangle (205,16);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (205,15) rectangle (206,16);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (236,15) rectangle (239,16);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (239,15) rectangle (240,16);
+\node[left, font=\scriptsize] at (0,15.5) {6\(\to\)9};
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (24,16) rectangle (27,17);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (27,16) rectangle (28,17);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (138,16) rectangle (141,17);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (141,16) rectangle (142,17);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (157,16) rectangle (160,17);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (160,16) rectangle (161,17);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (193,16) rectangle (196,17);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (196,16) rectangle (197,17);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (205,16) rectangle (208,17);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (208,16) rectangle (209,17);
+\node[left, font=\scriptsize] at (0,16.5) {7\(\to\)1};
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (3,17) rectangle (6,18);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (6,17) rectangle (7,18);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (33,17) rectangle (36,18);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (36,17) rectangle (37,18);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (102,17) rectangle (105,18);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (105,17) rectangle (106,18);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (169,17) rectangle (172,18);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (172,17) rectangle (173,18);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (175,17) rectangle (178,18);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (178,17) rectangle (179,18);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (209,17) rectangle (212,18);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (212,17) rectangle (213,18);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (224,17) rectangle (227,18);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (227,17) rectangle (228,18);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (245,17) rectangle (248,18);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (248,17) rectangle (249,18);
+\node[left, font=\scriptsize] at (0,17.5) {7\(\to\)2};
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (27,18) rectangle (30,19);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (30,18) rectangle (31,19);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (52,18) rectangle (55,19);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (55,18) rectangle (56,19);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (114,18) rectangle (117,19);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (117,18) rectangle (118,19);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (160,18) rectangle (163,19);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (163,18) rectangle (164,19);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (221,18) rectangle (224,19);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (224,18) rectangle (225,19);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (227,18) rectangle (230,19);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (230,18) rectangle (231,19);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (242,18) rectangle (245,19);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (245,18) rectangle (246,19);
+\node[left, font=\scriptsize] at (0,18.5) {7\(\to\)5};
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (21,19) rectangle (24,20);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (24,19) rectangle (25,20);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (74,19) rectangle (77,20);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (77,19) rectangle (78,20);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (132,19) rectangle (135,20);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (135,19) rectangle (136,20);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (144,19) rectangle (147,20);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (147,19) rectangle (148,20);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (154,19) rectangle (157,20);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (157,19) rectangle (158,20);
+\node[left, font=\scriptsize] at (0,19.5) {7\(\to\)6};
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (36,20) rectangle (39,21);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (39,20) rectangle (40,21);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (49,20) rectangle (52,21);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (52,20) rectangle (53,21);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (83,20) rectangle (86,21);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (86,20) rectangle (87,21);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (99,20) rectangle (102,21);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (102,20) rectangle (103,21);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (120,20) rectangle (123,21);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (123,20) rectangle (124,21);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (135,20) rectangle (138,21);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (138,20) rectangle (139,21);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (239,20) rectangle (242,21);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (242,20) rectangle (243,21);
+\node[left, font=\scriptsize] at (0,20.5) {7\(\to\)8};
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (15,21) rectangle (18,22);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (18,21) rectangle (19,22);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (42,21) rectangle (45,22);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (45,21) rectangle (46,22);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (59,21) rectangle (62,22);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (62,21) rectangle (63,22);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (199,21) rectangle (202,22);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (202,21) rectangle (203,22);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (233,21) rectangle (236,22);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (236,21) rectangle (237,22);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (251,21) rectangle (254,22);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (254,21) rectangle (255,22);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (255,21) rectangle (258,22);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (258,21) rectangle (259,22);
+\node[left, font=\scriptsize] at (0,21.5) {7\(\to\)9};
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (36,22) rectangle (39,23);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (39,22) rectangle (40,23);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (126,22) rectangle (129,23);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (129,22) rectangle (130,23);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (163,22) rectangle (166,23);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (166,22) rectangle (167,23);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (261,22) rectangle (264,23);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (264,22) rectangle (265,23);
+\node[left, font=\scriptsize] at (0,22.5) {8\(\to\)4};
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (33,23) rectangle (36,24);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (36,23) rectangle (37,24);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (55,23) rectangle (58,24);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (58,23) rectangle (59,24);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (59,23) rectangle (62,24);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (62,23) rectangle (63,24);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (74,23) rectangle (77,24);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (77,23) rectangle (78,24);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (160,23) rectangle (163,24);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (163,23) rectangle (164,24);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (190,23) rectangle (193,24);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (193,23) rectangle (194,24);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (227,23) rectangle (230,24);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (230,23) rectangle (231,24);
+\node[left, font=\scriptsize] at (0,23.5) {8\(\to\)7};
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (18,24) rectangle (21,25);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (21,24) rectangle (22,25);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (45,24) rectangle (48,25);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (48,24) rectangle (49,25);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (49,24) rectangle (52,25);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (52,24) rectangle (53,25);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (258,24) rectangle (261,25);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (261,24) rectangle (262,25);
+\node[left, font=\scriptsize] at (0,24.5) {8\(\to\)10};
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (62,25) rectangle (65,26);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (65,25) rectangle (66,26);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (77,25) rectangle (80,26);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (80,25) rectangle (81,26);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (123,25) rectangle (126,26);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (126,25) rectangle (127,26);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (248,25) rectangle (251,26);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (251,25) rectangle (252,26);
+\node[left, font=\scriptsize] at (0,25.5) {9\(\to\)6};
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (36,26) rectangle (39,27);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (39,26) rectangle (40,27);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (71,26) rectangle (74,27);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (74,26) rectangle (75,27);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (114,26) rectangle (117,27);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (117,26) rectangle (118,27);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (138,26) rectangle (141,27);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (141,26) rectangle (142,27);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (178,26) rectangle (181,27);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (181,26) rectangle (182,27);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (193,26) rectangle (196,27);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (196,26) rectangle (197,27);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (221,26) rectangle (224,27);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (224,26) rectangle (225,27);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (245,26) rectangle (248,27);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (248,26) rectangle (249,27);
+\node[left, font=\scriptsize] at (0,26.5) {9\(\to\)7};
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (30,27) rectangle (33,28);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (33,27) rectangle (34,28);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (92,27) rectangle (95,28);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (95,27) rectangle (96,28);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (105,27) rectangle (108,28);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (108,27) rectangle (109,28);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (172,27) rectangle (175,28);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (175,27) rectangle (176,28);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (202,27) rectangle (205,28);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (205,27) rectangle (206,28);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (233,27) rectangle (236,28);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (236,27) rectangle (237,28);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (255,27) rectangle (258,28);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (258,27) rectangle (259,28);
+\node[left, font=\scriptsize] at (0,27.5) {9\(\to\)10};
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (33,28) rectangle (36,29);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (36,28) rectangle (37,29);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (105,28) rectangle (108,29);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (108,28) rectangle (109,29);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (126,28) rectangle (129,29);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (129,28) rectangle (130,29);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (181,28) rectangle (184,29);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (184,28) rectangle (185,29);
+\node[left, font=\scriptsize] at (0,28.5) {10\(\to\)8};
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (45,29) rectangle (48,30);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (48,29) rectangle (49,30);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (62,29) rectangle (65,30);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (65,29) rectangle (66,30);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (77,29) rectangle (80,30);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (80,29) rectangle (81,30);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (129,29) rectangle (132,30);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (132,29) rectangle (133,30);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (178,29) rectangle (181,30);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (181,29) rectangle (182,30);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (193,29) rectangle (196,30);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (196,29) rectangle (197,30);
+\fill[fill={rgb,255:red,66;green,133;blue,244}] (221,29) rectangle (224,30);
+\fill[fill={rgb,255:red,150;green,150;blue,150}] (224,29) rectangle (225,30);
+\node[left, font=\scriptsize] at (0,29.5) {10\(\to\)9};
+\foreach \s in {0,40,...,280} {\draw[gray!30] (\s,0) -- (\s,30); \node[below, font=\scriptsize] at (\s,30) {\s};}
+\draw[gray!60] (0,0) rectangle (280,30);
+\node[font=\small] at (140.0,32.5) {FSU};
+\node[font=\small] at (140.0,34.5) {\textcolor[RGB]{66,133,244}{\rule{2.5mm}{2.5mm}} Working\quad \textcolor[RGB]{251,188,5}{\rule{2.5mm}{2.5mm}} Protection\quad \textcolor[RGB]{150,150,150}{\rule{2.5mm}{2.5mm}} Guard band\quad \textcolor[RGB]{222,200,140}{\rule{2.5mm}{2.5mm}} Protection guard band\quad };
+\end{tikzpicture}
+\end{adjustbox}\end{center}
+\clearpage
+\section*{Path Length Distribution}
+
+\begin{center}\begin{tikzpicture}
+\begin{axis}[
+  ybar, bar width=1.000cm, width=12.000cm, height=7cm,
+  ymin=0, ymajorgrids, grid style={gray!25}, axis lines*=left,
+  enlarge x limits={abs=1.000cm}, xtick=data, major x tick style={draw=none},
+  x tick label style={rotate=90, font=\scriptsize, /pgf/number format/1000 sep=},
+  legend style={at={(0.5,-0.3)}, anchor=north, legend columns=-1, draw=none},
+  ylabel={Paths},
+  xlabel={Path length (km)},
+  symbolic x coords={0-200,200-400,400-600,600-800,800-1000,1000-1200,1200-1400,1400-1600,1600-1800,1800-2000}]
+\addplot[fill={rgb,255:red,66;green,133;blue,244}, draw=none] coordinates {(0-200,12.000) (200-400,29.000) (400-600,28.000) (600-800,13.000) (800-1000,7.000) (1000-1200,0.000) };
+\end{axis}
+\end{tikzpicture}\end{center}
+\clearpage
+\section*{Utilization Entropy}
+\begin{center}\begin{adjustbox}{max width=\linewidth}
+\begin{tikzpicture}[baseline, >={Stealth[length=2mm]},
+  netnode/.style={circle, draw, thick, fill=gray!10, minimum size=7mm, inner sep=1pt},
+  link/.style={thick},
+  linklabel/.style={font=\scriptsize, inner sep=1pt, fill=white, fill opacity=0.85, text opacity=1}]
+\node[netnode] (S1) at (6.000,10.000) {1};
+\node[netnode] (S2) at (10.500,10.000) {2};
+\node[netnode] (S3) at (1.500,10.000) {3};
+\node[netnode] (S4) at (15.000,10.000) {4};
+\node[netnode] (S5) at (0.000,5.000) {5};
+\node[netnode] (S6) at (1.500,0.000) {6};
+\node[netnode] (S7) at (6.000,5.000) {7};
+\node[netnode] (S8) at (12.000,5.000) {8};
+\node[netnode] (S9) at (8.400,0.000) {9};
+\node[netnode] (S10) at (12.000,0.000) {10};
+\draw[link, ->] (S1) to[bend left=12] node[linklabel, auto] {0.025} (S2);
+\draw[link, ->] (S1) to[bend left=12] node[linklabel, auto] {0.031} (S3);
+\draw[link, ->] (S1) to[bend left=12] node[linklabel, auto] {0.044} (S7);
+\draw[link, ->] (S2) to[bend left=12] node[linklabel, auto] {0.025} (S1);
+\draw[link, ->] (S2) to[bend left=12] node[linklabel, auto] {0.044} (S4);
+\draw[link, ->] (S2) to[bend left=12] node[linklabel, auto] {0.044} (S7);
+\draw[link, ->] (S3) to[bend left=12] node[linklabel, auto] {0.034} (S1);
+\draw[link, ->] (S3) to[bend left=12] node[linklabel, auto] {0.031} (S5);
+\draw[link, ->] (S4) to[bend left=12] node[linklabel, auto] {0.038} (S2);
+\draw[link, ->] (S4) to[bend left=12] node[linklabel, auto] {0.031} (S8);
+\draw[link, ->] (S5) to[bend left=12] node[linklabel, auto] {0.034} (S3);
+\draw[link, ->] (S5) to[bend left=12] node[linklabel, auto] {0.031} (S6);
+\draw[link, ->] (S5) to[bend left=12] node[linklabel, auto] {0.031} (S7);
+\draw[link, ->] (S6) to[bend left=12] node[linklabel, auto] {0.025} (S5);
+\draw[link, ->] (S6) to[bend left=12] node[linklabel, auto] {0.031} (S7);
+\draw[link, ->] (S6) to[bend left=12] node[linklabel, auto] {0.031} (S9);
+\draw[link, ->] (S7) to[bend left=12] node[linklabel, auto] {0.031} (S1);
+\draw[link, ->] (S7) to[bend left=12] node[linklabel, auto] {0.050} (S2);
+\draw[link, ->] (S7) to[bend left=12] node[linklabel, auto] {0.044} (S5);
+\draw[link, ->] (S7) to[bend left=12] node[linklabel, auto] {0.031} (S6);
+\draw[link, ->] (S7) to[bend left=12] node[linklabel, auto] {0.044} (S8);
+\draw[link, ->] (S7) to[bend left=12] node[linklabel, auto] {0.044} (S9);
+\draw[link, ->] (S8) to[bend left=12] node[linklabel, auto] {0.025} (S4);
+\draw[link, ->] (S8) to[bend left=12] node[linklabel, auto] {0.044} (S7);
+\draw[link, ->] (S8) to[bend left=12] node[linklabel, auto] {0.025} (S10);
+\draw[link, ->] (S9) to[bend left=12] node[linklabel, auto] {0.025} (S6);
+\draw[link, ->] (S9) to[bend left=12] node[linklabel, auto] {0.050} (S7);
+\draw[link, ->] (S9) to[bend left=12] node[linklabel, auto] {0.044} (S10);
+\draw[link, ->] (S10) to[bend left=12] node[linklabel, auto] {0.025} (S8);
+\draw[link, ->] (S10) to[bend left=12] node[linklabel, auto] {0.044} (S9);
+\end{tikzpicture}
+\end{adjustbox}\end{center}
+
+\begin{center}\begin{tikzpicture}
+\begin{axis}[
+  ybar, bar width=1.000cm, width=18.000cm, height=7cm,
+  ymin=0, ymajorgrids, grid style={gray!25}, axis lines*=left,
+  enlarge x limits={abs=1.000cm}, xtick=data, major x tick style={draw=none},
+  x tick label style={rotate=90, font=\scriptsize, /pgf/number format/1000 sep=},
+  legend style={at={(0.5,-0.3)}, anchor=north, legend columns=-1, draw=none},
+  ylabel={Links},
+  xlabel={Entropy},
+  symbolic x coords={0.00-0.01,0.01-0.02,0.02-0.03,0.03-0.04,0.04-0.05,0.05-0.06,0.06-0.07,0.07-0.08,0.08-0.09,0.09-0.10,0.10-0.11,0.11-0.12,0.12-0.13,0.13-0.14,0.14-0.15,0.15-0.16,0.16-0.17,0.17-0.18,0.18-0.19,0.19-0.20,0.20-0.21,0.21-0.22,0.22-0.23,0.23-0.24,0.24-0.25,0.25-0.26,0.26-0.27,0.27-0.28,0.28-0.29,0.29-0.30,0.30-0.31,0.31-0.32,0.32-0.33,0.33-0.34,0.34-0.35,0.35-0.36,0.36-0.37,0.37-0.38,0.38-0.39,0.39-0.40,0.40-0.41,0.41-0.42,0.42-0.43,0.43-0.44,0.44-0.45,0.45-0.46,0.46-0.47,0.47-0.48,0.48-0.49,0.49-0.50,0.50-0.51,0.51-0.52,0.52-0.53,0.53-0.54,0.54-0.55,0.55-0.56,0.56-0.57,0.57-0.58,0.58-0.59,0.59-0.60,0.60-0.61,0.61-0.62,0.62-0.63,0.63-0.64,0.64-0.65,0.65-0.66,0.66-0.67,0.67-0.68,0.68-0.69,0.69-0.70,0.70-0.71,0.71-0.72,0.72-0.73,0.73-0.74,0.74-0.75,0.75-0.76,0.76-0.77,0.77-0.78,0.78-0.79,0.79-0.80,0.80-0.81,0.81-0.82,0.82-0.83,0.83-0.84,0.84-0.85,0.85-0.86,0.86-0.87,0.87-0.88,0.88-0.89,0.89-0.90,0.90-0.91,0.91-0.92,0.92-0.93,0.93-0.94,0.94-0.95,0.95-0.96,0.96-0.97,0.97-0.98,0.98-0.99,0.99-1.00}]
+\addplot[fill={rgb,255:red,66;green,133;blue,244}, draw=none] coordinates {(0.00-0.01,0.000) (0.01-0.02,0.000) (0.02-0.03,7.000) (0.03-0.04,12.000) (0.04-0.05,9.000) (0.05-0.06,2.000) };
+\end{axis}
+\end{tikzpicture}\end{center}
+\clearpage
+\section*{Shannon Entropy}
+\begin{center}\begin{adjustbox}{max width=\linewidth}
+\begin{tikzpicture}[baseline, >={Stealth[length=2mm]},
+  netnode/.style={circle, draw, thick, fill=gray!10, minimum size=7mm, inner sep=1pt},
+  link/.style={thick},
+  linklabel/.style={font=\scriptsize, inner sep=1pt, fill=white, fill opacity=0.85, text opacity=1}]
+\node[netnode] (S1) at (6.000,10.000) {1};
+\node[netnode] (S2) at (10.500,10.000) {2};
+\node[netnode] (S3) at (1.500,10.000) {3};
+\node[netnode] (S4) at (15.000,10.000) {4};
+\node[netnode] (S5) at (0.000,5.000) {5};
+\node[netnode] (S6) at (1.500,0.000) {6};
+\node[netnode] (S7) at (6.000,5.000) {7};
+\node[netnode] (S8) at (12.000,5.000) {8};
+\node[netnode] (S9) at (8.400,0.000) {9};
+\node[netnode] (S10) at (12.000,0.000) {10};
+\draw[link, ->] (S1) to[bend left=12] node[linklabel, auto] {0.175} (S2);
+\draw[link, ->] (S1) to[bend left=12] node[linklabel, auto] {0.219} (S3);
+\draw[link, ->] (S1) to[bend left=12] node[linklabel, auto] {0.306} (S7);
+\draw[link, ->] (S2) to[bend left=12] node[linklabel, auto] {0.175} (S1);
+\draw[link, ->] (S2) to[bend left=12] node[linklabel, auto] {0.306} (S4);
+\draw[link, ->] (S2) to[bend left=12] node[linklabel, auto] {0.306} (S7);
+\draw[link, ->] (S3) to[bend left=12] node[linklabel, auto] {0.263} (S1);
+\draw[link, ->] (S3) to[bend left=12] node[linklabel, auto] {0.219} (S5);
+\draw[link, ->] (S4) to[bend left=12] node[linklabel, auto] {0.263} (S2);
+\draw[link, ->] (S4) to[bend left=12] node[linklabel, auto] {0.219} (S8);
+\draw[link, ->] (S5) to[bend left=12] node[linklabel, auto] {0.263} (S3);
+\draw[link, ->] (S5) to[bend left=12] node[linklabel, auto] {0.219} (S6);
+\draw[link, ->] (S5) to[bend left=12] node[linklabel, auto] {0.219} (S7);
+\draw[link, ->] (S6) to[bend left=12] node[linklabel, auto] {0.175} (S5);
+\draw[link, ->] (S6) to[bend left=12] node[linklabel, auto] {0.219} (S7);
+\draw[link, ->] (S6) to[bend left=12] node[linklabel, auto] {0.219} (S9);
+\draw[link, ->] (S7) to[bend left=12] node[linklabel, auto] {0.219} (S1);
+\draw[link, ->] (S7) to[bend left=12] node[linklabel, auto] {0.350} (S2);
+\draw[link, ->] (S7) to[bend left=12] node[linklabel, auto] {0.306} (S5);
+\draw[link, ->] (S7) to[bend left=12] node[linklabel, auto] {0.219} (S6);
+\draw[link, ->] (S7) to[bend left=12] node[linklabel, auto] {0.306} (S8);
+\draw[link, ->] (S7) to[bend left=12] node[linklabel, auto] {0.306} (S9);
+\draw[link, ->] (S8) to[bend left=12] node[linklabel, auto] {0.175} (S4);
+\draw[link, ->] (S8) to[bend left=12] node[linklabel, auto] {0.306} (S7);
+\draw[link, ->] (S8) to[bend left=12] node[linklabel, auto] {0.175} (S10);
+\draw[link, ->] (S9) to[bend left=12] node[linklabel, auto] {0.175} (S6);
+\draw[link, ->] (S9) to[bend left=12] node[linklabel, auto] {0.350} (S7);
+\draw[link, ->] (S9) to[bend left=12] node[linklabel, auto] {0.306} (S10);
+\draw[link, ->] (S10) to[bend left=12] node[linklabel, auto] {0.175} (S8);
+\draw[link, ->] (S10) to[bend left=12] node[linklabel, auto] {0.306} (S9);
+\end{tikzpicture}
+\end{adjustbox}\end{center}
+
+\begin{center}\begin{tikzpicture}
+\begin{axis}[
+  ybar, bar width=1.000cm, width=18.000cm, height=7cm,
+  ymin=0, ymajorgrids, grid style={gray!25}, axis lines*=left,
+  enlarge x limits={abs=1.000cm}, xtick=data, major x tick style={draw=none},
+  x tick label style={rotate=90, font=\scriptsize, /pgf/number format/1000 sep=},
+  legend style={at={(0.5,-0.3)}, anchor=north, legend columns=-1, draw=none},
+  ylabel={Links},
+  xlabel={Entropy},
+  symbolic x coords={0.000-0.050,0.050-0.100,0.100-0.150,0.150-0.200,0.200-0.250,0.250-0.300,0.300-0.350,0.350-0.400,0.400-0.450,0.450-0.500,0.500-0.550,0.550-0.600,0.600-0.650,0.650-0.700,0.700-0.750,0.750-0.800,0.800-0.850,0.850-0.900,0.900-0.950,0.950-1.000}]
+\addplot[fill={rgb,255:red,66;green,133;blue,244}, draw=none] coordinates {(0.000-0.050,0.000) (0.050-0.100,0.000) (0.100-0.150,0.000) (0.150-0.200,7.000) (0.200-0.250,9.000) (0.250-0.300,3.000) (0.300-0.350,9.000) (0.350-0.400,2.000) };
+\end{axis}
+\end{tikzpicture}\end{center}
+
+\end{document}

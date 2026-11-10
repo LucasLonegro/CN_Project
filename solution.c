@@ -1,7 +1,9 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include <math.h>
+#include <inttypes.h>
 //#include <sys/stat.h>
 //#include <sys/types.h>
 
@@ -18,7 +20,7 @@
 #include "routing_solution.h"
 #include "graph_drawing.h"
 
-#define LINK_USAGE_MAX_PLOT 2000
+#define LINK_USAGE_MAX_BINS 20
 #define LINK_USAGE_PLOT_INTERVAL 25
 
 #define PATH_LENGTH_MAX_PLOT 2000
@@ -44,11 +46,6 @@ void free_assignment(assignment_t *assignment)
     if (assignment->is_split)
         free_assignment(assignment->split);
     free(assignment);
-}
-
-char *noop_labeler(const void *data, uint64_t from, uint64_t to)
-{
-    return "";
 }
 
 hex_color get_hex_color(assignment_t assignment)
@@ -86,7 +83,8 @@ void print_assignment_latex(const network_t *network, assignment_t *assignment, 
     path_drawing assignment_path = {.line = SOLID_LINE, .offset = OFFSET_DOWN, .path = assignment->path, .color = get_hex_color(*assignment), .data = &data1, .labeler = read_slots};
     path_drawing protection_path = {.line = DOTTED_LINE, .offset = OFFSET_DOWN, .path = protection->path, .color = get_hex_color(*protection), .data = &data2, .labeler = read_slots};
     path_drawing paths[] = {assignment_path, protection_path};
-    print_graph(network, noop_labeler, NULL, coordinates, paths, protection->path == NULL || protection->path->length == -1 ? 1 : 2, 0.9, 0.8, file, 0);
+    edge_style edges = {0};
+    print_graph(network, edges, coordinates, paths, protection->path == NULL || protection->path->length == -1 ? 1 : 2, 0.9, 0.8, file, 0);
 }
 
 __ssize_t highest_fsu_in_assignent(assignment_t *assignment)
@@ -121,7 +119,7 @@ double utilization_entropy(const dynamic_char_array *frequency_slots)
     for (uint64_t i = 0; i < frequency_slots->size; i++)
     {//go over all FSUs
         int slot_status = get_element(frequency_slots, i);
-        if (slot_status == USED || status == PROTECTION_USED){
+        if (slot_status == USED || slot_status == PROTECTION_USED){
             slot_status = UUSED;
         }else{
             slot_status = UN_USED;
@@ -161,7 +159,7 @@ double shannon_entropy(const dynamic_char_array *frequency_slots)
         //int slot_status = get_element(frequency_slots, i) == USED ? USED : UNUSED;
 
         int slot_status = get_element(frequency_slots, i);
-        if (slot_status == USED || status == PROTECTION_USED){
+        if (slot_status == USED || slot_status == PROTECTION_USED){
             slot_status = UUSED;
         }else{
             slot_status = UN_USED;
@@ -210,50 +208,100 @@ typedef struct read_link_weight_data_t
 char *read_link_weight(const void *data, uint64_t from, uint64_t to)
 {
     read_link_weight_data_t *_data = (read_link_weight_data_t *)data;
-    snprintf(_data->buffer, sizeof(_data->buffer), "%ld", get_link_weight(_data->network, from, to));
+    snprintf(_data->buffer, sizeof(_data->buffer), "%zd", get_link_weight(_data->network, from, to));
     return _data->buffer;
+}
+
+typedef struct link_load_data_t
+{
+    char buffer[32];
+    const uint64_t *loads;
+    uint64_t node_count;
+    uint64_t max_load;
+} link_load_data_t;
+
+char *read_link_load(const void *data, uint64_t from, uint64_t to)
+{
+    link_load_data_t *_data = (link_load_data_t *)data;
+    snprintf(_data->buffer, sizeof(_data->buffer), "%" PRIu64, _data->loads[from * _data->node_count + to]);
+    return _data->buffer;
+}
+
+hex_color link_load_color(const void *data, uint64_t from, uint64_t to)
+{
+    const link_load_data_t *_data = data;
+    return color_scale(_data->max_load ? (double)_data->loads[from * _data->node_count + to] / _data->max_load : 0);
+}
+
+void print_link_load_map(const network_t *network, coordinate *coordinates, const uint64_t *total_link_loads, uint64_t max_load, FILE *f)
+{
+    link_load_data_t data = {.loads = total_link_loads, .node_count = network->node_count, .max_load = max_load};
+    edge_style edges = {.labeler = read_link_load, .label_data = &data, .colorer = link_load_color, .color_data = &data};
+    print_graph(network, edges, coordinates, NULL, 0, BIG_TOPOLOGY_X_SCALE, BIG_TOPOLOGY_Y_SCALE, f, BIDIRECTIONAL | FIT_TO_PAGE | THICK_EDGES);
+    print_color_scale_legend(f, 0, max_load, "Load (Gb/s)");
+}
+
+void print_spectrum_occupancy(const network_t *network, const dynamic_char_array *used_frequency_slots, FILE *f)
+{
+    static const char *status_names[] = {[UNUSED] = NULL, [USED] = "Working", [PROTECTION_USED] = "Protection", [GUARD_BAND] = "Guard band", [PROTECTION_GUARD_BAND] = "Protection guard band"};
+    static const hex_color status_colors[] = {[UNUSED] = {255, 255, 255}, [USED] = {66, 133, 244}, [PROTECTION_USED] = {251, 188, 5}, [GUARD_BAND] = {150, 150, 150}, [PROTECTION_GUARD_BAND] = {222, 200, 140}};
+    uint64_t n = network->node_count;
+    char **labels = calloc(n * n, sizeof(char *));
+    const dynamic_char_array **rows = calloc(n * n, sizeof(dynamic_char_array *));
+    uint64_t row_count = 0, slot_count = 1;
+    for (uint64_t from = 0; from < n; from++)
+    {
+        for (uint64_t to = 0; to < n; to++)
+        {
+            if (from == to || get_link_weight(network, from, to) == -1)
+                continue;
+            labels[row_count] = malloc(64);
+            snprintf(labels[row_count], 64, "%" PRIu64 "\\(\\to\\)%" PRIu64, from + 1, to + 1);
+            rows[row_count] = used_frequency_slots + from * n + to;
+            if (rows[row_count]->size > slot_count)
+                slot_count = rows[row_count]->size;
+            row_count++;
+        }
+    }
+    if (slot_count > MAX_SPECTRAL_SLOTS)
+        slot_count = MAX_SPECTRAL_SLOTS;
+    spectrum_map map = {.row_count = row_count, .row_labels = labels, .rows = rows, .slot_count = slot_count, .status_count = sizeof(status_colors) / sizeof(status_colors[0]), .status_names = status_names, .status_colors = status_colors, .skip_status = UNUSED, .width = 15};
+    print_spectrum_map(map, f);
+    for (uint64_t i = 0; i < row_count; i++)
+        free(labels[i]);
+    free(labels);
+    free(rows);
 }
 
 void print_link_usage(uint64_t topology_node_count, uint64_t *total_link_loads, FILE *f)
 {
-    data_point points[LINK_USAGE_MAX_PLOT / LINK_USAGE_PLOT_INTERVAL + 1][1] = {0};
-    char *link_loads_x_labels[LINK_USAGE_MAX_PLOT / LINK_USAGE_PLOT_INTERVAL + 1];
-    uint64_t index = 0;
-    for (uint64_t i = 0; i < LINK_USAGE_MAX_PLOT; i += LINK_USAGE_PLOT_INTERVAL)
+    uint64_t max_load = 0;
+    for (uint64_t i = 0; i < topology_node_count * topology_node_count; i++)
+        if (total_link_loads[i] > max_load)
+            max_load = total_link_loads[i];
+    uint64_t interval = LINK_USAGE_PLOT_INTERVAL;
+    while (max_load / interval >= LINK_USAGE_MAX_BINS)
+        interval *= 2;
+    uint64_t bins = max_load / interval + 1;
+
+    data_point *points = calloc(bins, sizeof(data_point));
+    char **labels = calloc(bins, sizeof(char *));
+    for (uint64_t i = 0; i < bins; i++)
     {
-        link_loads_x_labels[index] = calloc(16, sizeof(char));
-        points[index][0].x = link_loads_x_labels[index];
-        snprintf(link_loads_x_labels[index], 16, "%ld-%ld", i, i + LINK_USAGE_PLOT_INTERVAL);
-        index++;
+        labels[i] = calloc(32, sizeof(char));
+        snprintf(labels[i], 32, "%" PRIu64 "-%" PRIu64, i * interval, (i + 1) * interval);
+        points[i].x = labels[i];
     }
-    char *legends[] = {"Load Range"};
-    bar_plot p = {.width = BIG_BAR_PLOT_WIDTH, .samples_count = 1, .legends = legends, .y_label = "Frequency", .data_points = (data_point *)points, .x_labels_count = (LINK_USAGE_MAX_PLOT / LINK_USAGE_PLOT_INTERVAL), .x_labels = link_loads_x_labels};
-    uint64_t link_usages[LINK_USAGE_MAX_PLOT / LINK_USAGE_PLOT_INTERVAL + 1];
-    for (uint64_t link_index = 0; link_index < topology_node_count * topology_node_count; link_index++)
-    {
-        uint64_t index = 0;
-        if (total_link_loads[link_index] > 0)
-        {
-            for (uint64_t i = 0; i < LINK_USAGE_MAX_PLOT; i += LINK_USAGE_PLOT_INTERVAL)
-            {
-                if (total_link_loads[link_index] < i)
-                {
-                    points[index - 1][0].y++;
-                    link_usages[index - 1]++;
-                    if (index > p.data_points_count)
-                        p.data_points_count = index + (index == (LINK_USAGE_MAX_PLOT / LINK_USAGE_PLOT_INTERVAL) ? 0 : 1);
-                    break;
-                }
-                index++;
-            }
-        }
-    }
+    for (uint64_t i = 0; i < topology_node_count * topology_node_count; i++)
+        if (total_link_loads[i] > 0)
+            points[total_link_loads[i] / interval].y++;
+
+    bar_plot p = {.width = BIG_BAR_PLOT_WIDTH, .samples_count = 1, .y_label = "Links", .x_label = "Link load (Gb/s)", .data_points = points, .data_points_count = bins, .x_labels = labels, .x_labels_count = bins};
     print_plot(p, f);
-    index = 0;
-    for (uint64_t i = 0; i < LINK_USAGE_MAX_PLOT; i += LINK_USAGE_PLOT_INTERVAL)
-    {
-        free(link_loads_x_labels[index++]);
-    }
+    for (uint64_t i = 0; i < bins; i++)
+        free(labels[i]);
+    free(labels);
+    free(points);
 }
 
 void print_path_lengths(uint64_t topology_node_count, assignment_t *assignments, uint64_t request_count, FILE *f)
@@ -268,8 +316,7 @@ void print_path_lengths(uint64_t topology_node_count, assignment_t *assignments,
         snprintf(link_loads_x_labels[index], 16, "%ld-%ld", i, i + PATH_LENGTH_PLOT_INTERVAL);
         index++;
     }
-    char *legends[] = {"Length Range"};
-    bar_plot p = {.width = BAR_PLOT_WIDTH, .samples_count = 1, .legends = legends, .y_label = "Frequency", .data_points = (data_point *)points, .x_labels_count = (PATH_LENGTH_MAX_PLOT / PATH_LENGTH_PLOT_INTERVAL), .x_labels = link_loads_x_labels};
+    bar_plot p = {.width = BAR_PLOT_WIDTH, .samples_count = 1, .y_label = "Paths", .x_label = "Path length (km)", .data_points = (data_point *)points, .x_labels_count = (PATH_LENGTH_MAX_PLOT / PATH_LENGTH_PLOT_INTERVAL), .x_labels = link_loads_x_labels};
     uint64_t link_usages[PATH_LENGTH_MAX_PLOT / PATH_LENGTH_PLOT_INTERVAL + 1];
     for (uint64_t assignment_index = 0; assignment_index < request_count; assignment_index++)
     {
@@ -316,9 +363,8 @@ char *read_entropy(const void *data, uint64_t from, uint64_t to)
 void print_entropy(const network_t *network, coordinate *coordinates, uint64_t topology_node_count, FILE *f, dynamic_char_array *used_frequency_slots)
 {
     read_entropy_data_t data = {.used_frequency_slots = used_frequency_slots, .network = network, .entropy_calculator = utilization_entropy};
-    print_graph(network, read_entropy, &data, coordinates, NULL, 0, BIG_TOPOLOGY_X_SCALE, BIG_TOPOLOGY_Y_SCALE, f, DRAW_ARROWS);
-    fprintf(f, "\n");
-    print_graph(network, read_entropy, &data, coordinates, NULL, 0, BIG_TOPOLOGY_X_SCALE, BIG_TOPOLOGY_Y_SCALE, f, DRAW_ARROWS | REVERSE_ARROWS);
+    edge_style edges = {.labeler = read_entropy, .label_data = &data};
+    print_graph(network, edges, coordinates, NULL, 0, BIG_TOPOLOGY_X_SCALE, BIG_TOPOLOGY_Y_SCALE, f, BIDIRECTIONAL | FIT_TO_PAGE);
     data_point points[ENTROPY_PLOT_INTERVALS_COUNT][1] = {0};
     char *link_loads_x_labels[ENTROPY_PLOT_INTERVALS_COUNT];
     uint64_t index = 0;
@@ -329,8 +375,7 @@ void print_entropy(const network_t *network, coordinate *coordinates, uint64_t t
         snprintf(link_loads_x_labels[index], 16, "%.2f-%.2f", i, i + ENTROPY_PLOT_INTERVAL);
         index++;
     }
-    char *legends[] = {"Entropy Range"};
-    bar_plot p = {.width = BIG_BAR_PLOT_WIDTH, .samples_count = 1, .legends = legends, .y_label = "Frequency", .data_points = (data_point *)points, .x_labels_count = (ENTROPY_PLOT_INTERVALS_COUNT), .x_labels = link_loads_x_labels};
+    bar_plot p = {.width = BIG_BAR_PLOT_WIDTH, .samples_count = 1, .y_label = "Links", .x_label = "Entropy", .data_points = (data_point *)points, .x_labels_count = (ENTROPY_PLOT_INTERVALS_COUNT), .x_labels = link_loads_x_labels};
     uint64_t link_usages[ENTROPY_PLOT_INTERVALS_COUNT];
     for (uint64_t from = 0; from < topology_node_count; from++)
     {
@@ -366,9 +411,8 @@ void print_entropy(const network_t *network, coordinate *coordinates, uint64_t t
 void print_shannon_entropy(const network_t *network, coordinate *coordinates, uint64_t topology_node_count, FILE *f, dynamic_char_array *used_frequency_slots)
 {
     read_entropy_data_t data = {.used_frequency_slots = used_frequency_slots, .network = network, .entropy_calculator = shannon_entropy};
-    print_graph(network, read_entropy, &data, coordinates, NULL, 0, BIG_TOPOLOGY_X_SCALE, BIG_TOPOLOGY_Y_SCALE, f, DRAW_ARROWS);
-    fprintf(f, "\n");
-    print_graph(network, read_entropy, &data, coordinates, NULL, 0, BIG_TOPOLOGY_X_SCALE, BIG_TOPOLOGY_Y_SCALE, f, DRAW_ARROWS | REVERSE_ARROWS);
+    edge_style edges = {.labeler = read_entropy, .label_data = &data};
+    print_graph(network, edges, coordinates, NULL, 0, BIG_TOPOLOGY_X_SCALE, BIG_TOPOLOGY_Y_SCALE, f, BIDIRECTIONAL | FIT_TO_PAGE);
     data_point points[SHANNON_ENTROPY_PLOT_INTERVALS_COUNT][1] = {0};
     char *link_loads_x_labels[SHANNON_ENTROPY_PLOT_INTERVALS_COUNT];
     uint64_t index = 0;
@@ -379,8 +423,7 @@ void print_shannon_entropy(const network_t *network, coordinate *coordinates, ui
         snprintf(link_loads_x_labels[index], 16, "%.3f-%.3f", i, i + SHANNON_ENTROPY_PLOT_INTERVAL);
         index++;
     }
-    char *legends[] = {"Entropy Range"};
-    bar_plot p = {.width = BIG_BAR_PLOT_WIDTH, .samples_count = 1, .legends = legends, .y_label = "Frequency", .data_points = (data_point *)points, .x_labels_count = (SHANNON_ENTROPY_PLOT_INTERVALS_COUNT), .x_labels = link_loads_x_labels};
+    bar_plot p = {.width = BIG_BAR_PLOT_WIDTH, .samples_count = 1, .y_label = "Links", .x_label = "Entropy", .data_points = (data_point *)points, .x_labels_count = (SHANNON_ENTROPY_PLOT_INTERVALS_COUNT), .x_labels = link_loads_x_labels};
     uint64_t link_usages[SHANNON_ENTROPY_PLOT_INTERVALS_COUNT];
     for (uint64_t from = 0; from < topology_node_count; from++)
     {
@@ -419,7 +462,8 @@ void print_report(const network_t *network, assignment_t *assignments, uint64_t 
 
     print_section(f, "Topology");
     read_link_weight_data_t data = {.network = network};
-    print_graph(network, read_link_weight, &data, coordinates, NULL, 0, BIG_TOPOLOGY_X_SCALE, BIG_TOPOLOGY_Y_SCALE, f, 0);
+    edge_style edges = {.labeler = read_link_weight, .label_data = &data};
+    print_graph(network, edges, coordinates, NULL, 0, TOPOLOGY_X_SCALE, TOPOLOGY_Y_SCALE, f, FIT_TO_PAGE);
 
     uint64_t topology_node_count = network->node_count;
 
@@ -440,7 +484,7 @@ void print_report(const network_t *network, assignment_t *assignments, uint64_t 
     {
         for(uint64_t i = 0; i < requests_count; i++)
         {
-            if (protections + i != NULL)
+            if (protections[i].path != NULL && protections[i].path->length != -1)
             {
                 __ssize_t slot = highest_fsu_in_assignent(protections + i);
                 if (slot > highest_fsu)
@@ -471,7 +515,7 @@ void print_report(const network_t *network, assignment_t *assignments, uint64_t 
     {
         for (uint64_t i = 0; i < requests_count; i++)
         {
-            if (protections + i != NULL)
+            if (protections[i].path != NULL && protections[i].path->length != -1)
             {
                 assignment_t* temp = protections + i;
                 do{
@@ -511,7 +555,7 @@ void print_report(const network_t *network, assignment_t *assignments, uint64_t 
     {
         for(uint64_t i = 0; i < requests_count; i++)
         {
-            if (protections + i != NULL)
+            if (protections[i].path != NULL && protections[i].path->length != -1)
             {
                 assignment_t *aux = protections + i;
                 do{
@@ -531,23 +575,24 @@ void print_report(const network_t *network, assignment_t *assignments, uint64_t 
     //////////////////////////////
     
     print_section(f, "Performance Parameters");
-    fprintf(f, "Highest link load: %ld\\\\\n", highest_loaded_link);
-    fprintf(f, "Highest used fsu: %ld out of %d\\\\\n", highest_fsu, MAX_SPECTRAL_SLOTS);
-    fprintf(f, "Total used fsus: %ld\\\\\n", total_fsus);
-    fprintf(f, "Modulation format use counts:\\\\ \
-        \\begin{itemize}");
+    fprintf(f, "\\begin{center}\\begin{tabular}{lr}\n\\toprule\n");
+    fprintf(f, "Highest link load & %zd Gb/s \\\\\n", highest_loaded_link);
+    fprintf(f, "Highest used FSU & %zd / %d \\\\\n", highest_fsu, MAX_SPECTRAL_SLOTS);
+    fprintf(f, "Total used FSUs & %" PRIu64 " \\\\\n", total_fsus);
+    fprintf(f, "Transponder cost & %.1f \\\\\n\\midrule\n", transponder_cost);
     for (uint64_t i = 0; i < MODULATION_FORMATS_DIM; i++)
-    {
-        fprintf(f, "\\item Format %ld (%s) has %ld usages", i + 1, formats[i].name, format_frequencies[i]);
-        if (i != MODULATION_FORMATS_DIM - 1)
-        {
-            fprintf(f, ". ");
-        }
-    }
-    fprintf(f, "\\end{itemize}\n");
-    fprintf(f, "Transponder costs: %.1f\n", transponder_cost);
+        fprintf(f, "%s transponders & %" PRIu64 " \\\\\n", formats[i].name, format_frequencies[i]);
+    fprintf(f, "\\bottomrule\n\\end{tabular}\\end{center}\n");
+
+    print_pagebreak(f);
+    print_section(f, "Link Load Map");
+    print_link_load_map(network, coordinates, total_link_loads, highest_loaded_link, f);
     print_section(f, "Link Load Distribution");
     print_link_usage(topology_node_count, total_link_loads, f);
+    print_pagebreak(f);
+    print_section(f, "Spectrum Occupancy");
+    print_spectrum_occupancy(network, used_frequency_slots, f);
+    print_pagebreak(f);
     print_section(f, "Path Length Distribution");
     print_path_lengths(topology_node_count, assignments, requests_count, f);
     if (protection == DEDICATED_PROTECTION)
@@ -555,13 +600,16 @@ void print_report(const network_t *network, assignment_t *assignments, uint64_t 
         print_section(f, "Protection Path Length Distribution");
         print_path_lengths(topology_node_count, protections, requests_count, f);
     }
+    print_pagebreak(f);
     print_section(f, "Utilization Entropy");
     print_entropy(network, coordinates, topology_node_count, f, used_frequency_slots);
+    print_pagebreak(f);
     print_section(f, "Shannon Entropy");
     print_shannon_entropy(network, coordinates, topology_node_count, f, used_frequency_slots);
 
     if (REPORT_ASSIGNMENTS)
     {
+        print_pagebreak(f);
         print_section(f, "Assignments");
         for (uint64_t i = 0; i < requests_count; i++)
         {
@@ -804,26 +852,77 @@ void german_benchmark(network_t *german_n)
     run_requests(german_n, (uint64_t *)g7_5, 1, "g7 5 - No Protection - Benchmarking Algorithm - Ascending", "reports/g7_5-BENCHMARK-ASC.tex", german_coordinates, NO_PROTECTION, FIXED_SHORTEST_PATH, LEAST_USED_SLOT, DEFAULT_MODULATION);
 }
 
-void run_solutions()
+typedef void (*scenario_runner)(network_t *network);
+
+typedef struct scenario
+{
+    const char *name;
+    scenario_runner german;
+    scenario_runner italian;
+} scenario;
+
+static const scenario scenarios[] = {
+    {"benchmark", german_benchmark, italian_benchmark},
+    {"nop", german_no_protection_custom_algorithm, italian_no_protection_custom_algorithm},
+    {"dedicated", german_dedicated_protection, italian_dedicated_protection},
+    {"shared", german_shared_protection, italian_shared_protection},
+};
+#define SCENARIOS_COUNT (sizeof(scenarios) / sizeof(scenarios[0]))
+
+void run_solutions(int run_german, int run_italian, const int *selected)
 {
     mkdir("./reports", S_IRWXU | S_IRWXG | S_IROTH);
-    network_t *german_n = build_network(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE);
-
-    //german_benchmark(german_n);
-    german_no_protection_custom_algorithm(german_n);
-    //german_dedicated_protection(german_n);
-    //german_shared_protection(german_n);
-    free_network(german_n);
-    network_t *italian_n = build_network(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE);
-    //italian_benchmark(italian_n);
-    italian_no_protection_custom_algorithm(italian_n);
-    //italian_dedicated_protection(italian_n);
-    //italian_shared_protection(italian_n);
-    free_network(italian_n);
+    if (run_german)
+    {
+        network_t *german_n = build_network(GERMAN_TOPOLOGY_SIZE, german_links, GERMAN_LINKS_SIZE);
+        for (uint64_t i = 0; i < SCENARIOS_COUNT; i++)
+            if (selected[i])
+                scenarios[i].german(german_n);
+        free_network(german_n);
+    }
+    if (run_italian)
+    {
+        network_t *italian_n = build_network(ITALIAN_TOPOLOGY_SIZE, italian_links, ITALIAN_LINKS_SIZE);
+        for (uint64_t i = 0; i < SCENARIOS_COUNT; i++)
+            if (selected[i])
+                scenarios[i].italian(italian_n);
+        free_network(italian_n);
+    }
 }
 
-int main(void)
+void print_usage(const char *program)
 {
-    run_solutions();
+    fprintf(stderr, "usage: %s [g7] [it10] [benchmark] [nop] [dedicated] [shared]\n", program);
+    fprintf(stderr, "with no network or scenario given, all of them are run\n");
+}
+
+int main(int argc, char **argv)
+{
+    int run_german = 0, run_italian = 0, any_scenario = 0;
+    int selected[SCENARIOS_COUNT] = {0};
+    for (int i = 1; i < argc; i++)
+    {
+        int matched = 0;
+        if (strcmp(argv[i], "g7") == 0)
+            run_german = matched = 1;
+        else if (strcmp(argv[i], "it10") == 0)
+            run_italian = matched = 1;
+        for (uint64_t j = 0; j < SCENARIOS_COUNT && !matched; j++)
+        {
+            if (strcmp(argv[i], scenarios[j].name) == 0)
+                selected[j] = any_scenario = matched = 1;
+        }
+        if (!matched)
+        {
+            print_usage(argv[0]);
+            return 1;
+        }
+    }
+    if (!run_german && !run_italian)
+        run_german = run_italian = 1;
+    if (!any_scenario)
+        for (uint64_t i = 0; i < SCENARIOS_COUNT; i++)
+            selected[i] = 1;
+    run_solutions(run_german, run_italian, selected);
     return 0;
 }
